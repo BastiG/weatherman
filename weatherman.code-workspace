@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"terminal.integrated.env.linux": {
+			"PATH": "/home/sebastian/.platformio/penv/bin:/home/sebastian/.platformio/penv:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl",
+			"PLATFORMIO_CALLER": "vscode"
+		},
+		"files.associations": {
+			"array": "cpp",
+			"*.tcc": "cpp",
+			"functional": "cpp",
+			"istream": "cpp",
+			"tuple": "cpp",
+			"utility": "cpp"
+		}
+	}
+}
