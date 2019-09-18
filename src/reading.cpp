@@ -3,7 +3,7 @@
 #include "main.h"
 #include "sensorhub.hpp"
 #include "mqtt.hpp"
-
+#include "constants.h"
 
 float _last_temperature;
 float _last_pressure;
@@ -14,7 +14,7 @@ float _last_rain_level;
 float _last_wind_speed;
 wind_direction_t _last_wind_direction;
 
-
+/*
 void readTemperature(void) {
   float temperature = 0;
   int sources = 0;
@@ -62,7 +62,6 @@ void readTemperature(void) {
     }
   }
 }
-
 void readPressure(void) {
   if (!bmp280_status.isInitDone()) return;
 
@@ -91,7 +90,7 @@ void readPressure(void) {
     }
   }
 }
-
+*/
 void readLuminosity(void) {
   if (!tsl2591_status.isInitDone()) return;
 
@@ -128,7 +127,7 @@ void readLuminosity(void) {
     }
   }
 }
-
+/*
 void readHumidity(void) {
   if (!si7021_status.isInitDone()) return;
 
@@ -151,7 +150,7 @@ void readHumidity(void) {
     }
   }
 }
-
+*/
 void readWindSpeed(void) {
   if (!anenometer_status.isInitDone()) return;
 

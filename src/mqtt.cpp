@@ -37,9 +37,9 @@ void MqttWeatherClient::setDeviceId(String id) {
 
 void MqttWeatherClient::mqttSendStatus(char* payload) {
     sendMessage("status/uptime", 0, false, String(millis()));
-    sendMessage("status/bmp280", 0, false, !bmp280_status.isInitDone() || bmp280_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/bmp280", 0, false, _sensorHub ? (_sensorHub->isBmp280Ready() ? "OK" : "FAILED") : "UNKNOWN");
     sendMessage("status/tsl2591", 0, false, !tsl2591_status.isInitDone() || tsl2591_status.isFail() ? "FAILED" : "OK");
-    sendMessage("status/si7021", 0, false, !si7021_status.isInitDone() || si7021_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/si7021", 0, false, _sensorHub ? (_sensorHub->isSi7021Ready() ? "OK" : "FAILED") : "UNKNOWN");
 
     sendMessage("status/anemometer", 0, false, !anenometer_status.isInitDone() || anenometer_status.isFail() ? "FAILED" : "OK");
     sendMessage("status/raingauge", 0, false, !rainGauge_status.isInitDone() || rainGauge_status.isFail() ? "FAILED" : "OK");
@@ -94,16 +94,16 @@ void MqttWeatherClient::mqttMessage(char* topic, char* payload,
   String sendStatus = MAIN_TOPIC + "/send/status";
   
   if (sendTemperature == topic || sendAll == topic) {
-    resetTemperature();
+    if (_sensorHub) _sensorHub->resetTemperature();
   }
   if (sendLuminosity == topic || sendAll == topic) {
     resetLuminosity();
   }
   if (sendHumidity == topic || sendAll == topic) {
-    resetHumidity();
+    if (_sensorHub) _sensorHub->resetHumidity();
   }
   if (sendPressure == topic || sendAll == topic) {
-    resetPressure();
+    if (_sensorHub) _sensorHub->resetPressure();
   }
   if (sendRain == topic || sendAll == topic) {
     resetRainLevel();
@@ -116,9 +116,9 @@ void MqttWeatherClient::mqttMessage(char* topic, char* payload,
   }
   if (sendStatus == topic) {
     sendMessage("status/uptime", 0, false, String(millis()));
-    sendMessage("status/bmp280", 0, false, !bmp280_status.isInitDone() || bmp280_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/bmp280", 0, false, _sensorHub ? (_sensorHub->isBmp280Ready() ? "OK" : "FAILED") : "UNKNOWN");
     sendMessage("status/tsl2591", 0, false, !tsl2591_status.isInitDone() || tsl2591_status.isFail() ? "FAILED" : "OK");
-    sendMessage("status/si7021", 0, false, !si7021_status.isInitDone() || si7021_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/si7021", 0, false, _sensorHub ? (_sensorHub->isSi7021Ready() ? "OK" : "FAILED") : "UNKNOWN");
 
     sendMessage("status/anemometer", 0, false, !anenometer_status.isInitDone() || anenometer_status.isFail() ? "FAILED" : "OK");
     sendMessage("status/raingauge", 0, false, !rainGauge_status.isInitDone() || rainGauge_status.isFail() ? "FAILED" : "OK");
@@ -157,4 +157,8 @@ bool MqttWeatherClient::sendMessage(String type, int qos, bool persistent, Strin
 
 String MqttWeatherClient::getId(void) {
   return _id;
+}
+
+void MqttWeatherClient::setSensors(SensorHub *sensorHub) {
+  _sensorHub = sensorHub;
 }

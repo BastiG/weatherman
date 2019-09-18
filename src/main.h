@@ -19,17 +19,17 @@
 
 extern MqttWeatherClient mqttClient;
 
-extern Adafruit_BMP280 bmp280;
+//extern Adafruit_BMP280 bmp280;
 extern Adafruit_TSL2591 tsl2591;
-extern Adafruit_Si7021 si7021;
+//extern Adafruit_Si7021 si7021;
 extern Anenometer anenometer;
 extern RainGauge rainGauge;
 extern WindVane windVane;
 
-extern DeviceStatus iot_status;
-extern DeviceStatus bmp280_status;
+//extern DeviceStatus iot_status;
+//extern DeviceStatus bmp280_status;
 extern DeviceStatus tsl2591_status;
-extern DeviceStatus si7021_status;
+//extern DeviceStatus si7021_status;
 
 extern DeviceStatus anenometer_status;
 extern DeviceStatus rainGauge_status;

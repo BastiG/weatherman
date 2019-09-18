@@ -11,6 +11,10 @@
 #include "Anemometer.hpp"
 #include "WindVane.hpp"
 
+extern "C" {
+  class MqttWeatherClient;
+}
+
 template <class T>
 struct Sensor {
     DeviceStatus status;
@@ -30,8 +34,14 @@ class SensorHub{
         std::vector<Sensor<Anenometer>> _anenometer_list;
         std::vector<Sensor<WindVane>> _windvane_list;
 
+        float _last_temperature;
+        float _last_pressure;
+        float _last_humidity;
+
         template <class T>
-        void prepareSensor(std::vector<Sensor<T>>& sensor_list);
+        void prepareSensors(std::vector<Sensor<T>>& sensor_list);
+        template <class T>
+        bool isSensorsReady(std::vector<Sensor<T>>& sensor_list);
     public:
         SensorHub(Basecamp *iot, MqttWeatherClient *mqtt);
 
@@ -39,11 +49,23 @@ class SensorHub{
         bool isBasecampReady(void);
 
         void setupBmp280(Adafruit_BMP280* bmp280);
+        void setupSi7021(Adafruit_Si7021* si7021);
+
+        bool isBmp280Ready(void);
+        bool isSi7021Ready(void);
 
         void prepareBmp280(void);
-        void readTemperature(void);
+        void prepareSi7021(void);
 
-/*        void setupSi7021(Adafruit_Si7021* si7021);
+        float readTemperature(void);
+        float readPressure(void);
+        float readHumidity(void);
+
+        void resetTemperature(void);
+        void resetPressure(void);
+        void resetHumidity(void);
+
+/*        
         void setupTsl2591(Adafruit_TSL2591* tsl2591);
         void setupRainGauge(RainGauge* raingauge);
         void setupAnenometer(Anenometer* anenometer);
@@ -51,8 +73,8 @@ class SensorHub{
 };
 
 //void setupBasecamp(Basecamp *iot);
-void setupBmp280(void);
-void setupSi7021(void);
+//void setupBmp280(void);
+//void setupSi7021(void);
 void setupTsl2591(void);
 void setupRainGauge(void);
 void setupAnenometer(void);

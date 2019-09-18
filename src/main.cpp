@@ -23,9 +23,9 @@ WindVane windVane(PIN_WINDVANE);
 MqttWeatherClient mqttClient(&iot.mqtt, &iot.configuration);
 
 // DeviceStatus iot_status("Basecamp failed");
-DeviceStatus bmp280_status("BMP280 failed");
+// DeviceStatus bmp280_status("BMP280 failed");
 DeviceStatus tsl2591_status("TSL2591 failed");
-DeviceStatus si7021_status("SI7021 failed");
+// DeviceStatus si7021_status("SI7021 failed");
 DeviceStatus anenometer_status("Anenometer failed");
 DeviceStatus rainGauge_status("Rain gauge failed");
 DeviceStatus windvane_status("Wind vane failed");
@@ -50,10 +50,11 @@ void setup() {
 
   pinMode(PIN_LED, OUTPUT);
 
-  //sensors.setupBmp280(&bmp280);
-  setupBmp280();
+  sensors.setupBmp280(&bmp280);
+  sensors.setupSi7021(&si7021);
+  //setupBmp280();
   setupTsl2591();
-  setupSi7021();
+  //setupSi7021();
 
   setupRainGauge();
   setupAnenometer();
@@ -61,10 +62,10 @@ void setup() {
 
   Serial.println("Init complete, ID=" + mqttClient.getId());
 
-  resetTemperature();
+  sensors.resetTemperature();
   resetLuminosity();
-  resetPressure();
-  resetHumidity();
+  sensors.resetPressure();
+  sensors.resetHumidity();
   resetRainLevel();
   resetWindSpeed();
   resetWindDirection();
@@ -94,18 +95,18 @@ void loop() {
     digitalWrite(PIN_LED, HIGH);
     delay(DELAY_1);
 
-    handleStatus(bmp280_status, setupBmp280);
+    sensors.prepareBmp280();
+    sensors.prepareSi7021();
     handleStatus(tsl2591_status, setupTsl2591);
-    handleStatus(si7021_status, setupSi7021);
 
     handleStatus(rainGauge_status, setupRainGauge);
     handleStatus(anenometer_status, setupAnenometer);
     handleStatus(windvane_status, setupWindVane);
 
-    readTemperature();
-    readPressure();
+    sensors.readTemperature();
+    sensors.readPressure();
     readLuminosity();
-    readHumidity();
+    sensors.readHumidity();
 
     readWindSpeed();
     readRainLevel();

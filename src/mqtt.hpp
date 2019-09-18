@@ -3,6 +3,11 @@
 
 #include <Basecamp.hpp>
 #include <Arduino.h>
+#include "sensorhub.hpp"
+
+extern "C" {
+  class SensorHub;
+}
 
 class MqttWeatherClient {
   private:
@@ -22,6 +27,8 @@ class MqttWeatherClient {
     AsyncMqttClient* _mqtt;
     String _id;
 
+    SensorHub *_sensorHub;
+
     void mqttSendStatus(char* payload);
 
   public:
@@ -29,6 +36,8 @@ class MqttWeatherClient {
     void setDeviceId(String id);
     bool sendMessage(String type, int qos, bool persistent, String payload);
     String getId(void);
+
+    void setSensors(SensorHub *sensorHub);
 };
 
 #endif
