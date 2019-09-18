@@ -14,16 +14,10 @@
 #include <RainGauge.hpp>
 #include <WindVane.hpp>
 
-#define PIN_LED         5
-#define PIN_ANEMOMETER  33  // Black wire
-#define PIN_WINDVANE    35  // Grey wire
-#define PIN_RAINGAUGE   13  // White wire
+#include "mqtt.hpp"
 
-#define DELAY_1         1000
-#define DELAY_2         1000
-#define BLINK_IOT_FAIL  9
 
-extern Basecamp iot;
+extern MqttWeatherClient mqttClient;
 
 extern Adafruit_BMP280 bmp280;
 extern Adafruit_TSL2591 tsl2591;
@@ -31,9 +25,6 @@ extern Adafruit_Si7021 si7021;
 extern Anenometer anenometer;
 extern RainGauge rainGauge;
 extern WindVane windVane;
-
-extern String ID;
-extern const String MAIN_TOPIC;
 
 extern DeviceStatus iot_status;
 extern DeviceStatus bmp280_status;

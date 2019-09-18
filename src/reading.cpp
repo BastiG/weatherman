@@ -1,8 +1,8 @@
 #include "reading.h"
 
 #include "main.h"
-#include "setup.h"
-#include "mqtt.h"
+#include "sensorhub.hpp"
+#include "mqtt.hpp"
 
 
 float _last_temperature;
@@ -27,7 +27,7 @@ void readTemperature(void) {
     } else {
       if (bmp280_status.isFail()) {
         bmp280.reset();
-        setupBmp280();
+//        setupBmp280();
         bmp280_status.recover();
       }
       float value = bmp280.readTemperature();
@@ -52,7 +52,7 @@ void readTemperature(void) {
   temperature /= sources;
 
   if (isnan(_last_temperature) || abs(_last_temperature - temperature) > _MIN_DELTA_TEMPERATURE) {
-    if (sendMessage("temperature", ID, 1, false, (String)temperature)) {
+    if (mqttClient.sendMessage("temperature", 1, false, (String)temperature)) {
       Serial.print("Temperature published: ");
       Serial.println(temperature);
       _last_temperature = temperature;
@@ -74,14 +74,14 @@ void readPressure(void) {
   }
   if (bmp280_status.isFail()) {
     bmp280.reset();
-    setupBmp280();
+//    setupBmp280();
     bmp280_status.recover();
   }
   float pressure = bmp280.readPressure() / 100;
   //Serial.print("[BMP280 PRES] "); Serial.println(pressure);
 
   if (isnan(_last_pressure) || abs(_last_pressure - pressure) > _MIN_DELTA_PRESSURE) {
-    if (sendMessage("pressure", ID, 1, false, (String)pressure)) {
+    if (mqttClient.sendMessage("pressure", 1, false, (String)pressure)) {
       Serial.print("Pressure published: ");
       Serial.println(pressure);
       _last_pressure = pressure;
@@ -118,7 +118,7 @@ void readLuminosity(void) {
   tsl2591_status.recover();
 
   if (isnan(_last_luminosity) || abs(_last_luminosity - luminosity) > _MIN_DELTA_LUMINOSITY || (luminosity == 0 && _last_luminosity != 0)) {
-    if (sendMessage("luminosity", ID, 1, false, (String)luminosity)) {
+    if (mqttClient.sendMessage("luminosity", 1, false, (String)luminosity)) {
       Serial.print("Luminosity published: ");
       Serial.println(luminosity);
       _last_luminosity = luminosity;
@@ -141,7 +141,7 @@ void readHumidity(void) {
   si7021_status.recover();
 
   if (isnan(_last_humidity) || abs(_last_humidity - humidity) > _MIN_DELTA_HUMIDITY) {
-    if (sendMessage("humidity", ID, 1, false, (String)humidity)) {
+    if (mqttClient.sendMessage("humidity", 1, false, (String)humidity)) {
       Serial.print("Humidity published: ");
       Serial.println(humidity);
       _last_humidity = humidity;
@@ -163,7 +163,7 @@ void readWindSpeed(void) {
   anenometer_status.recover();
 
   if (isnan(_last_wind_speed) || abs(_last_wind_speed - wind_speed) > _MIN_DELTA_WIND_SPEED || (wind_speed == 0 && _last_wind_speed != 0)) {
-    if (sendMessage("wind/speed", ID, 0, false, (String)wind_speed)) {
+    if (mqttClient.sendMessage("wind/speed", 1, false, (String)wind_speed)) {
       Serial.print("Wind speed published: ");
       Serial.println(wind_speed);
       _last_wind_speed = wind_speed;
@@ -186,7 +186,7 @@ void readRainLevel(void) {
   if (isnan(_last_rain_level) || abs(_last_rain_level - rain_level) > _MIN_DELTA_RAIN_LEVEL || (rain_level == 0 && _last_rain_level != 0)) {
     //float rain_level_15m = rainGauge.getRainLevel(RAIN_15M);
     //float rain_level_1m = rainGauge.getRainLevel(RAIN_1M);
-    if (sendMessage("rain", ID, 0, false, (String)rain_level)) {
+    if (mqttClient.sendMessage("rain", 1, false, (String)rain_level)) {
       Serial.print("Rain level published: ");
       Serial.println(rain_level);
       _last_rain_level = rain_level;
@@ -207,7 +207,7 @@ void readWindDirection(void) {
   if (wind_direction != _last_wind_direction) {
     String direction_string = windVane.translateWindDirection(wind_direction);
 
-    if (sendMessage("wind/direction", ID, 1, false, direction_string)) {
+    if (mqttClient.sendMessage("wind/direction", 1, false, direction_string)) {
       Serial.print("Wind direction published: ");
       Serial.println(direction_string);
       _last_wind_direction = wind_direction;

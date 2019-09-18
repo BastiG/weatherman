@@ -1,18 +1,12 @@
 #include "Anemometer.hpp"
 
 #include <math.h>
+#include <functional>
 
 extern "C"
 {
 	extern void __attachInterruptFunctionalArg(uint8_t pin, void (*userFunc)(void*), void * arg, int intr_type, bool functional);
 }
-
-void IRAM_ATTR _anenometer_triggered(void* arg) {
-    if (arg) {
-        ((Anenometer*)arg)->trigger();
-    }
-}
-
 
 Anenometer::Anenometer(uint8_t pin, bool high_active) :
         _pin(pin), _high_active(high_active),
@@ -25,14 +19,20 @@ Anenometer::~Anenometer(void) {
 }
 
 bool Anenometer::begin(void) {
+    using namespace std::placeholders;
+
     for (int i=0; i<Anenometer::_SAMPLES; i++) {
         _readings[i].start = 0;
         _readings[i].value = 0;
     }
     _readings[_index_reading].start = millis();
     pinMode(_pin, _high_active ? INPUT_PULLDOWN : INPUT_PULLUP);
-    __attachInterruptFunctionalArg(_pin, _anenometer_triggered, this, _high_active ? RISING : FALLING, true);
+    __attachInterruptFunctionalArg(_pin, Anenometer::triggerCallback, this, _high_active ? RISING : FALLING, true);
     return true;
+}
+
+void IRAM_ATTR Anenometer::triggerCallback(void* arg) {
+    reinterpret_cast<Anenometer*>(arg)->trigger();
 }
 
 void IRAM_ATTR Anenometer::trigger(void) {

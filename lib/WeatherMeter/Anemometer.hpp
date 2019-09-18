@@ -10,6 +10,9 @@ struct _anenometer_reading {
 
 class Anenometer {
     private:
+        static void IRAM_ATTR triggerCallback(void* arg);
+        void IRAM_ATTR trigger(void);
+
         static constexpr uint16_t _WINDSPEED_FACTOR = 2400;     // 2400m/h per trigger
         static constexpr uint8_t _DEBOUNCE = 1;                 // minimum 1 ms between interrupts
         static constexpr uint16_t _SAMPLES = 3;                 // smooth over 3 readings
@@ -33,7 +36,6 @@ class Anenometer {
         Anenometer(uint8_t pin, bool high_active = false);
         ~Anenometer(void);
         bool begin(void);
-        void IRAM_ATTR trigger(void);
         float getWindSpeed(void);
 
         void setStormWarning(void (*storm_warning)(float), float warn_threshold);

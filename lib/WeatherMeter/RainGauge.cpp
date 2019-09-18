@@ -13,14 +13,6 @@ RainGauge::RainGauge(uint8_t pin, bool high_active) :
 RainGauge::~RainGauge() {
 }
 
-void IRAM_ATTR _raingauge_triggered(void* arg)
-{
-	if (arg)
-	{
-	  ((RainGauge*)arg)->triggered();
-	}
-}
-
 bool RainGauge::begin() {
     for (uint16_t i = 0; i<RainGauge::_SAMPLES; i++) {
         _readings[i].timestamp = 0;
@@ -29,11 +21,15 @@ bool RainGauge::begin() {
     _readings[_index_reading].timestamp = millis();
 
     pinMode(_pin, _high_active ? INPUT_PULLDOWN : INPUT_PULLUP);
-    __attachInterruptFunctionalArg (_pin, _raingauge_triggered, this, _high_active ? RISING : FALLING, true);
+    __attachInterruptFunctionalArg (_pin, RainGauge::triggerCallback, this, _high_active ? RISING : FALLING, true);
     return true;
 }
 
-void IRAM_ATTR RainGauge::triggered(void) {
+void IRAM_ATTR RainGauge::triggerCallback(void* arg) {
+    reinterpret_cast<RainGauge*>(arg)->trigger();
+}
+
+void IRAM_ATTR RainGauge::trigger(void) {
     ulong now = millis();
     if (now - _last_reading < RainGauge::_DEBOUNCE)
         return;

@@ -1,43 +1,97 @@
-#include "mqtt.h"
+#include "mqtt.hpp"
+#include <functional>
 
+#include "main.h"
 #include "reading.h"
 
-int _mqtt_failed = 0;
+#include "constants.h"
 
-void mqttConnected(bool sessionPresent) {
-  Serial.print("MQTT connected - ");
-  Serial.println(sessionPresent);
-  iot.mqtt.subscribe((MAIN_TOPIC + "/send/" + ID + "/#").c_str(),2);
-  iot.mqtt.subscribe((MAIN_TOPIC + "/send/all/#").c_str(),2);
-  iot.mqtt.publish((MAIN_TOPIC + "/status/online").c_str(), 1, true, ID.c_str());
-};
+const String MqttWeatherClient::MAIN_TOPIC = MQTT_MAIN_TOPIC;
 
-void mqttDisconnected(AsyncMqttClientDisconnectReason reason) {
-  //Serial.println("MQTT connection lost");
+MqttWeatherClient::MqttWeatherClient(AsyncMqttClient* mqtt, Configuration* configuration) :
+        _mqtt_failed(0), _mqtt(mqtt), _id("0") {
+    Serial.println("MqttWeatherClient constructor called");
+
+    using namespace std::placeholders;
+
+    _mqtt->onConnect(std::bind(&MqttWeatherClient::mqttConnected, this, _1));
+    _mqtt->onDisconnect(std::bind(&MqttWeatherClient::mqttDisconnected, this, _1));
+    _mqtt->onSubscribe(std::bind(&MqttWeatherClient::mqttSubscribed, this, _1, _2));
+    _mqtt->onMessage(std::bind(&MqttWeatherClient::mqttMessage, this, _1, _2, _3, _4, _5, _6));
+    _mqtt->onPublish(std::bind(&MqttWeatherClient::mqttPublished, this, _1));
+
+    if (configuration->keyExists(CONFIG_DEVICE_ID)) {
+      _id = configuration->get(CONFIG_DEVICE_ID);
+    }
 }
 
-void mqttSubscribed(uint16_t packetId, uint8_t qos) {
-  Serial.println("Successfully subscribed");
-};
+void MqttWeatherClient::setDeviceId(String id) {
+    _id = id;
 
-void mqttMessage(char* topic, char* payload,
+    messageCallbacks.clear();
+    messageCallbacks[MAIN_TOPIC + "/send/" + _id + "/status"] = std::vector<void (MqttWeatherClient::*)(char*)> { &MqttWeatherClient::mqttSendStatus };
+    messageCallbacks[MAIN_TOPIC + "/send/*/status"] = std::vector<void (MqttWeatherClient::*)(char*)> { &MqttWeatherClient::mqttSendStatus };
+
+    _mqtt->disconnect(true);
+}
+
+void MqttWeatherClient::mqttSendStatus(char* payload) {
+    sendMessage("status/uptime", 0, false, String(millis()));
+    sendMessage("status/bmp280", 0, false, !bmp280_status.isInitDone() || bmp280_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/tsl2591", 0, false, !tsl2591_status.isInitDone() || tsl2591_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/si7021", 0, false, !si7021_status.isInitDone() || si7021_status.isFail() ? "FAILED" : "OK");
+
+    sendMessage("status/anemometer", 0, false, !anenometer_status.isInitDone() || anenometer_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/raingauge", 0, false, !rainGauge_status.isInitDone() || rainGauge_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/windvane", 0, false, !windvane_status.isInitDone() || windvane_status.isFail() ? "FAILED" : "OK");
+}
+
+void MqttWeatherClient::mqttConnected(bool sessionPresent) {
+  Serial.print("MQTT connected - ");
+  Serial.println(sessionPresent);
+  _mqtt->subscribe((MAIN_TOPIC + "/send/" + _id + "/#").c_str(),2);
+  _mqtt->subscribe((MAIN_TOPIC + "/send/*/#").c_str(),2);
+  _mqtt->publish((MAIN_TOPIC + "/status/online/" + _id).c_str(), 1, true, String(millis()).c_str());
+}
+
+void MqttWeatherClient::mqttDisconnected(AsyncMqttClientDisconnectReason reason) {
+  Serial.println("MQTT connection lost");
+}
+
+void MqttWeatherClient::mqttSubscribed(uint16_t packetId, uint8_t qos) {
+  Serial.println("Successfully subscribed");
+}
+
+void MqttWeatherClient::mqttMessage(char* topic, char* payload,
   AsyncMqttClientMessageProperties properties,
   size_t len, size_t index, size_t total) {
-  Serial.println("MQTT received subscribed topic:");
-  Serial.print("Topic:");
+  Serial.print("[MQTT] Topic: ");
   Serial.println(topic);
-  Serial.print("Payload:");
+  Serial.print("[MQTT] Payload: ");
   Serial.println(payload);
+
+  Serial.print("Message callback: "); Serial.println(messageCallbacks.size());
+
+  std::map<String, std::vector<void (MqttWeatherClient::*)(char*)>>::iterator it;
+  for (it = messageCallbacks.begin(); it != messageCallbacks.end(); ++it) {
+      Serial.print(" -> "); Serial.println(it->first);
+  }
+  it = messageCallbacks.find(String(topic));
+  if (it != messageCallbacks.end()) {
+      (this->*(it->second[0]))(payload);
+  } else {
+      Serial.println("[MQTT] No suitable message callback found for topic");
+  }
   
-  String sendTemperature = iot.hostname + "/send/temperature";
-  String sendLuminosity = iot.hostname + "/send/luminosity";
-  String sendHumidity = iot.hostname + "/send/humidity";
-  String sendPressure = iot.hostname + "/send/pressure";
-  String sendRain = iot.hostname + "/send/rain";
-  String sendWindSpeed = iot.hostname + "/send/wind/speed";
-  String sendWindDirection = iot.hostname + "/send/wind/direction";
-  String sendAll = iot.hostname + "/send/all";
-  String sendStatus = iot.hostname + "/send/status";
+  String sendTemperature = MAIN_TOPIC + "/send/temperature";
+  String sendLuminosity = MAIN_TOPIC + "/send/luminosity";
+  String sendHumidity = MAIN_TOPIC + "/send/humidity";
+  String sendPressure = MAIN_TOPIC + "/send/pressure";
+  String sendRain = MAIN_TOPIC + "/send/rain";
+  String sendWindSpeed = MAIN_TOPIC + "/send/wind/speed";
+  String sendWindDirection = MAIN_TOPIC + "/send/wind/direction";
+  String sendAll = MAIN_TOPIC + "/send/all";
+  String sendStatus = MAIN_TOPIC + "/send/status";
   
   if (sendTemperature == topic || sendAll == topic) {
     resetTemperature();
@@ -61,35 +115,36 @@ void mqttMessage(char* topic, char* payload,
     resetWindDirection();
   }
   if (sendStatus == topic) {
-    sendMessage("status/bmp280", ID, 0, false, !bmp280_status.isInitDone() || bmp280_status.isFail() ? "FAILED" : "OK");
-    sendMessage("status/tsl2591", ID, 0, false, !tsl2591_status.isInitDone() || tsl2591_status.isFail() ? "FAILED" : "OK");
-    sendMessage("status/si7021", ID, 0, false, !si7021_status.isInitDone() || si7021_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/uptime", 0, false, String(millis()));
+    sendMessage("status/bmp280", 0, false, !bmp280_status.isInitDone() || bmp280_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/tsl2591", 0, false, !tsl2591_status.isInitDone() || tsl2591_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/si7021", 0, false, !si7021_status.isInitDone() || si7021_status.isFail() ? "FAILED" : "OK");
 
-    sendMessage("status/anemometer", ID, 0, false, !anenometer_status.isInitDone() || anenometer_status.isFail() ? "FAILED" : "OK");
-    sendMessage("status/raingauge", ID, 0, false, !rainGauge_status.isInitDone() || rainGauge_status.isFail() ? "FAILED" : "OK");
-    sendMessage("status/windvane", ID, 0, false, !windvane_status.isInitDone() || windvane_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/anemometer", 0, false, !anenometer_status.isInitDone() || anenometer_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/raingauge", 0, false, !rainGauge_status.isInitDone() || rainGauge_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/windvane", 0, false, !windvane_status.isInitDone() || windvane_status.isFail() ? "FAILED" : "OK");
   }
-};
+}
 
-void mqttPublished(uint16_t packetId) {
+void MqttWeatherClient::mqttPublished(uint16_t packetId) {
   Serial.println("MQTT message published");
-};
+}
 
-bool sendMessage(String type, String id, int qos, bool persistent, String payload) {
-  if (!iot.mqtt.connected()) {
+bool MqttWeatherClient::sendMessage(String type, int qos, bool persistent, String payload) {
+  if (!_mqtt->connected()) {
     Serial.println("Not connected to MQTT, try & connect");
-    iot.mqtt.connect();
+    _mqtt->connect();
   }
-  if (iot.mqtt.connected()) {
-    String topic = MAIN_TOPIC + "/" + type + "/" + id;
-    uint16_t rc = iot.mqtt.publish(topic.c_str(), qos, persistent, payload.c_str());
+  if (_mqtt->connected()) {
+    String topic = MAIN_TOPIC + "/" + type + "/" + _id;
+    uint16_t rc = _mqtt->publish(topic.c_str(), qos, persistent, payload.c_str());
     if (rc == 0) {
       Serial.print("MQTT publish failed: ");
       Serial.println(_mqtt_failed);
       if (_mqtt_failed++ > 5) {
         Serial.println("Forcing reconnect");
-        iot.mqtt.disconnect(true);
-        iot.mqtt.connect();
+        _mqtt->disconnect(true);
+        _mqtt->connect();
       }
       return false;
     }
@@ -98,4 +153,8 @@ bool sendMessage(String type, String id, int qos, bool persistent, String payloa
   } else {
     return false;
   }
+}
+
+String MqttWeatherClient::getId(void) {
+  return _id;
 }

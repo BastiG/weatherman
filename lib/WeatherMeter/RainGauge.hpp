@@ -16,6 +16,9 @@ struct rain_reading_t {
 
 class RainGauge {
     private:
+        static void IRAM_ATTR triggerCallback(void* arg);
+        void IRAM_ATTR trigger(void);
+
         static constexpr float_t _RAIN_FACTOR = 0.2794f;        // bucket tilt means 0.2794mm of rain
         static constexpr uint8_t _DEBOUNCE = 1;                 // minimum 1 ms between interrupts
         static constexpr uint16_t _SAMPLES = 4000;              // number of samples
@@ -30,7 +33,6 @@ class RainGauge {
         RainGauge(uint8_t pin, bool high_active = false);
         ~RainGauge(void);
         bool begin(void);
-        void IRAM_ATTR triggered(void);
 
         float getRainLevel(rain_timeframe_t timeframe);
 };
