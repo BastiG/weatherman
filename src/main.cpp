@@ -1,7 +1,7 @@
 #include <math.h>
 
 #include "main.h"
-#include "sensorhub.hpp"
+#include "SensorHub.hpp"
 #include "reading.h"
 
 #include "constants.h"
@@ -24,10 +24,10 @@ MqttWeatherClient mqttClient(&iot.mqtt, &iot.configuration);
 
 // DeviceStatus iot_status("Basecamp failed");
 // DeviceStatus bmp280_status("BMP280 failed");
-DeviceStatus tsl2591_status("TSL2591 failed");
+//DeviceStatus tsl2591_status("TSL2591 failed");
 // DeviceStatus si7021_status("SI7021 failed");
 DeviceStatus anenometer_status("Anenometer failed");
-DeviceStatus rainGauge_status("Rain gauge failed");
+//DeviceStatus rainGauge_status("Rain gauge failed");
 DeviceStatus windvane_status("Wind vane failed");
 
 SensorHub sensors(&iot, &mqttClient);
@@ -52,21 +52,23 @@ void setup() {
 
   sensors.setupBmp280(&bmp280);
   sensors.setupSi7021(&si7021);
+  sensors.setupTsl2591(&tsl2591);
   //setupBmp280();
-  setupTsl2591();
+  //setupTsl2591();
   //setupSi7021();
 
-  setupRainGauge();
+  sensors.setupRainGauge(&rainGauge);
+  //setupRainGauge();
   setupAnenometer();
   setupWindVane();
 
   Serial.println("Init complete, ID=" + mqttClient.getId());
 
   sensors.resetTemperature();
-  resetLuminosity();
+  sensors.resetLuminosity();
   sensors.resetPressure();
   sensors.resetHumidity();
-  resetRainLevel();
+  sensors.resetRainLevel();
   resetWindSpeed();
   resetWindDirection();
 }
@@ -97,19 +99,19 @@ void loop() {
 
     sensors.prepareBmp280();
     sensors.prepareSi7021();
-    handleStatus(tsl2591_status, setupTsl2591);
+    sensors.prepareTsl2591();
+    sensors.prepareRainGauge();
 
-    handleStatus(rainGauge_status, setupRainGauge);
     handleStatus(anenometer_status, setupAnenometer);
     handleStatus(windvane_status, setupWindVane);
 
     sensors.readTemperature();
     sensors.readPressure();
-    readLuminosity();
+    sensors.readLuminosity();
     sensors.readHumidity();
+    sensors.readRainLevel();
 
     readWindSpeed();
-    readRainLevel();
     readWindDirection();
   }
 

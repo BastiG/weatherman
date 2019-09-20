@@ -1,14 +1,13 @@
 #include "reading.h"
 
 #include "main.h"
-#include "sensorhub.hpp"
 #include "mqtt.hpp"
 #include "constants.h"
 
-float _last_temperature;
+/*float _last_temperature;
 float _last_pressure;
 float _last_luminosity;
-float _last_humidity;
+float _last_humidity;*/
 
 float _last_rain_level;
 float _last_wind_speed;
@@ -90,7 +89,7 @@ void readPressure(void) {
     }
   }
 }
-*/
+
 void readLuminosity(void) {
   if (!tsl2591_status.isInitDone()) return;
 
@@ -127,7 +126,7 @@ void readLuminosity(void) {
     }
   }
 }
-/*
+
 void readHumidity(void) {
   if (!si7021_status.isInitDone()) return;
 
@@ -171,7 +170,7 @@ void readWindSpeed(void) {
     }
   }
 }
-
+/*
 void readRainLevel(void) {
   if (!rainGauge_status.isInitDone()) return;
 
@@ -194,7 +193,7 @@ void readRainLevel(void) {
     }
   }
 }
-
+*/
 void readWindDirection(void) {
   wind_direction_t wind_direction = windVane.getWindDirection();
   if (wind_direction == WD_UNKNOWN) {
@@ -217,7 +216,7 @@ void readWindDirection(void) {
   }
 }
 
-
+/*
 void resetTemperature(void) {
     _last_temperature = NAN;
 }
@@ -230,6 +229,7 @@ void resetLuminosity(void) {
 void resetHumidity(void) {
     _last_humidity = NAN;
 }
+*/
 void resetWindSpeed(void) {
     _last_wind_speed = NAN;
 }

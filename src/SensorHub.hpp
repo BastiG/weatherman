@@ -17,8 +17,8 @@ extern "C" {
 
 template <class T>
 struct Sensor {
-    DeviceStatus status;
-    T* sensor;
+    DeviceStatus *status;
+    T *sensor;
     std::function<bool(void)> begin;
 };
 
@@ -37,7 +37,11 @@ class SensorHub{
         float _last_temperature;
         float _last_pressure;
         float _last_humidity;
+        float _last_luminosity;
+        float _last_rainlevel;
 
+        template <class T>
+        bool setupSensor(std::vector<Sensor<T>>& sensor_list, T *device, String deviceName, std::function<bool(void)> beginFunc);
         template <class T>
         void prepareSensors(std::vector<Sensor<T>>& sensor_list);
         template <class T>
@@ -48,34 +52,38 @@ class SensorHub{
         void setupBasecamp(void);
         bool isBasecampReady(void);
 
-        void setupBmp280(Adafruit_BMP280* bmp280);
-        void setupSi7021(Adafruit_Si7021* si7021);
+        bool setupBmp280(Adafruit_BMP280 *bmp280);
+        bool setupSi7021(Adafruit_Si7021 *si7021);
+        bool setupTsl2591(Adafruit_TSL2591 *tsl2591);
+        bool setupRainGauge(RainGauge *raingauge);
 
         bool isBmp280Ready(void);
         bool isSi7021Ready(void);
+        bool isTsl2591Ready(void);
+        bool isRainGaugeReady(void);
 
         void prepareBmp280(void);
         void prepareSi7021(void);
+        void prepareTsl2591(void);
+        void prepareRainGauge(void);
 
         float readTemperature(void);
         float readPressure(void);
         float readHumidity(void);
+        float readLuminosity(void);
+        float readRainLevel(void);
 
         void resetTemperature(void);
         void resetPressure(void);
         void resetHumidity(void);
-
-/*        
-        void setupTsl2591(Adafruit_TSL2591* tsl2591);
-        void setupRainGauge(RainGauge* raingauge);
-        void setupAnenometer(Anenometer* anenometer);
-        void setupWindVane(WindVane* windvane);*/
+        void resetLuminosity(void);
+        void resetRainLevel(void);
 };
 
 //void setupBasecamp(Basecamp *iot);
 //void setupBmp280(void);
 //void setupSi7021(void);
-void setupTsl2591(void);
+//void setupTsl2591(void);
 void setupRainGauge(void);
 void setupAnenometer(void);
 void setupWindVane(void);

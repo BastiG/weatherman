@@ -13,14 +13,20 @@ void DeviceStatus::initDone() {
 }
 
 void DeviceStatus::fail(const String &message) {
-    if (isFail()) return;
+    if (isFail()) {
+        _failure_count++;
+        return;
+    }
 
     fail();
     Serial.println(message);
 }
 
 void DeviceStatus::fail() {
-    if (isFail()) return;
+    if (isFail()) {
+        _failure_count++;
+        return;
+    }
 
     _failure_count++;
     _signalled = false;

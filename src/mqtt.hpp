@@ -3,7 +3,7 @@
 
 #include <Basecamp.hpp>
 #include <Arduino.h>
-#include "sensorhub.hpp"
+#include "SensorHub.hpp"
 
 extern "C" {
   class SensorHub;
