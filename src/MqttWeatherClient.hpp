@@ -1,5 +1,5 @@
-#ifndef _WEATHERMAN_MQTT_HPP_
-#define _WEATHERMAN_MQTT_HPP_
+#ifndef _WEATHERMAN_MQTTWEATHERCLIENT_HPP_
+#define _WEATHERMAN_MQTTWEATHERCLIENT_HPP_
 
 #include <Basecamp.hpp>
 #include <Arduino.h>

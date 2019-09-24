@@ -1,8 +1,7 @@
 #include <math.h>
 
-#include "main.h"
+#include "MqttWeatherClient.hpp"
 #include "SensorHub.hpp"
-#include "reading.h"
 
 #include "constants.h"
 
@@ -22,28 +21,12 @@ WindVane windVane(PIN_WINDVANE);
 
 MqttWeatherClient mqttClient(&iot.mqtt, &iot.configuration);
 
-// DeviceStatus iot_status("Basecamp failed");
-// DeviceStatus bmp280_status("BMP280 failed");
-//DeviceStatus tsl2591_status("TSL2591 failed");
-// DeviceStatus si7021_status("SI7021 failed");
-DeviceStatus anenometer_status("Anenometer failed");
-//DeviceStatus rainGauge_status("Rain gauge failed");
-DeviceStatus windvane_status("Wind vane failed");
-
 SensorHub sensors(&iot, &mqttClient);
 
 
-/*void setupBasecampBound() {
-  setupBasecamp(&iot);
-}*/
-
-void storm_warning(float wind_speed) {
+void wind_warning(float wind_speed) {
   mqttClient.sendMessage("wind/warning", 0, false, (String)wind_speed);
 }
-
-
-
-
 
 void setup() {
   sensors.setupBasecamp();
@@ -53,14 +36,11 @@ void setup() {
   sensors.setupBmp280(&bmp280);
   sensors.setupSi7021(&si7021);
   sensors.setupTsl2591(&tsl2591);
-  //setupBmp280();
-  //setupTsl2591();
-  //setupSi7021();
-
+  
   sensors.setupRainGauge(&rainGauge);
-  //setupRainGauge();
-  setupAnenometer();
-  setupWindVane();
+  sensors.setupAnenometer(&anenometer);
+  sensors.setupWindVane(&windVane);
+  anenometer.setWindWarning(wind_warning, WIND_WARNING_SPEED);
 
   Serial.println("Init complete, ID=" + mqttClient.getId());
 
@@ -69,22 +49,8 @@ void setup() {
   sensors.resetPressure();
   sensors.resetHumidity();
   sensors.resetRainLevel();
-  resetWindSpeed();
-  resetWindDirection();
-}
-
-bool handleStatus(DeviceStatus &status, void (*setupFunc)(void)) {
-  if (!status.isInitDone()) {
-    setupFunc();
-  }
-
-  if (status.isFail()) {
-    if (status.shouldSignal() && mqttClient.sendMessage("error", 1, false, status.failureMessage())) {
-      status.signalled();
-    }
-    return false;
-  }
-  return true;
+  sensors.resetWindSpeed();
+  sensors.resetWindDirection();
 }
 
 void loop() {
@@ -101,18 +67,16 @@ void loop() {
     sensors.prepareSi7021();
     sensors.prepareTsl2591();
     sensors.prepareRainGauge();
-
-    handleStatus(anenometer_status, setupAnenometer);
-    handleStatus(windvane_status, setupWindVane);
+    sensors.prepareAnenometer();
+    sensors.prepareWindVane();
 
     sensors.readTemperature();
     sensors.readPressure();
     sensors.readLuminosity();
     sensors.readHumidity();
     sensors.readRainLevel();
-
-    readWindSpeed();
-    readWindDirection();
+    sensors.readWindSpeed();
+    sensors.readWindDirection();
   }
 
   digitalWrite(PIN_LED, LOW);

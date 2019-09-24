@@ -12,7 +12,7 @@ Anenometer::Anenometer(uint8_t pin, bool high_active) :
         _pin(pin), _high_active(high_active),
         _last_reading(0), _index_reading(0),
         _last_sample(0), _last_sample_requested(0),
-        _warn_threshold(NAN), _storm_warned(0), _storm_warning(nullptr) {
+        _warn_threshold(NAN), _wind_warned(0), _wind_warning(nullptr) {
 }
 
 Anenometer::~Anenometer(void) {
@@ -77,9 +77,9 @@ float Anenometer::getWindSpeed(void) {
 
             if (!isnan(_warn_threshold)) {
                 if (value > _warn_threshold) {
-                    if (_storm_warning && (_storm_warned == 0 || abs(value - _storm_warned) > 10) && !warning_active) {
-                        _storm_warned = value;
-                        _storm_warning(value);
+                    if (_wind_warning && (_wind_warned == 0 || abs(value - _wind_warned) > 10) && !warning_active) {
+                        _wind_warned = value;
+                        _wind_warning(value);
                     }
                     warning_active = true;
                 }
@@ -97,7 +97,7 @@ float Anenometer::getWindSpeed(void) {
 
     if (!warning_active) {
         // no warning active? reset
-        _storm_warned = 0;
+        _wind_warned = 0;
     }
 
     // read to next buffer entry
@@ -114,8 +114,8 @@ float Anenometer::getWindSpeed(void) {
     return _last_sample;
 }
 
-void Anenometer::setStormWarning(void (*storm_warning)(float), float warn_threshold) {
-    _storm_warning = storm_warning;
+void Anenometer::setWindWarning(void (*wind_warning)(float), float warn_threshold) {
+    _wind_warning = wind_warning;
     _warn_threshold = warn_threshold;
-    _storm_warned = 0;
+    _wind_warned = 0;
 }

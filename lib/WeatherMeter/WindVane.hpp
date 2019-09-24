@@ -38,7 +38,9 @@ class WindVane {
         ~WindVane(void);
         bool begin(void);
         wind_direction_t getWindDirection(void);
-        String translateWindDirection(wind_direction_t wd);
+    
+    public:
+        static String translateWindDirection(wind_direction_t wd);
 };
 
 #endif

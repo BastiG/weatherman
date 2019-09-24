@@ -3,7 +3,7 @@
 
 #include "DeviceStatus.hpp"
 #include "Basecamp.hpp"
-#include "mqtt.hpp"
+#include "MqttWeatherClient.hpp"
 #include <Adafruit_BMP280.h>
 #include <Adafruit_Si7021.h>
 #include <Adafruit_TSL2591.h>
@@ -39,6 +39,8 @@ class SensorHub{
         float _last_humidity;
         float _last_luminosity;
         float _last_rainlevel;
+        float _last_windspeed;
+        wind_direction_t _last_winddirection;
 
         template <class T>
         bool setupSensor(std::vector<Sensor<T>>& sensor_list, T *device, String deviceName, std::function<bool(void)> beginFunc);
@@ -56,36 +58,38 @@ class SensorHub{
         bool setupSi7021(Adafruit_Si7021 *si7021);
         bool setupTsl2591(Adafruit_TSL2591 *tsl2591);
         bool setupRainGauge(RainGauge *raingauge);
+        bool setupAnenometer(Anenometer *anenometer);
+        bool setupWindVane(WindVane *windvane);
 
         bool isBmp280Ready(void);
         bool isSi7021Ready(void);
         bool isTsl2591Ready(void);
         bool isRainGaugeReady(void);
+        bool isAnenometerReady(void);
+        bool isWindVaneReady(void);
 
         void prepareBmp280(void);
         void prepareSi7021(void);
         void prepareTsl2591(void);
         void prepareRainGauge(void);
+        void prepareAnenometer(void);
+        void prepareWindVane(void);
 
         float readTemperature(void);
         float readPressure(void);
         float readHumidity(void);
         float readLuminosity(void);
         float readRainLevel(void);
+        float readWindSpeed(void);
+        wind_direction_t readWindDirection(void);
 
         void resetTemperature(void);
         void resetPressure(void);
         void resetHumidity(void);
         void resetLuminosity(void);
         void resetRainLevel(void);
+        void resetWindSpeed(void);
+        void resetWindDirection(void);
 };
-
-//void setupBasecamp(Basecamp *iot);
-//void setupBmp280(void);
-//void setupSi7021(void);
-//void setupTsl2591(void);
-void setupRainGauge(void);
-void setupAnenometer(void);
-void setupWindVane(void);
 
 #endif

@@ -1,8 +1,5 @@
-#include "mqtt.hpp"
+#include "MqttWeatherClient.hpp"
 #include <functional>
-
-#include "main.h"
-#include "reading.h"
 
 #include "constants.h"
 
@@ -43,9 +40,9 @@ void MqttWeatherClient::mqttSendStatus(char* payload) {
     sendMessage("status/tsl2591", 0, false, _sensorHub ? (_sensorHub->isTsl2591Ready() ? "OK" : "FAILED") : "UNKNOWN");
     sendMessage("status/si7021", 0, false, _sensorHub ? (_sensorHub->isSi7021Ready() ? "OK" : "FAILED") : "UNKNOWN");
 
-    sendMessage("status/anemometer", 0, false, !anenometer_status.isInitDone() || anenometer_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/anemometer", 0, false, _sensorHub ? (_sensorHub->isAnenometerReady() ? "OK" : "FAILED") : "UNKNOWN");
     sendMessage("status/raingauge", 0, false, _sensorHub ? (_sensorHub->isRainGaugeReady() ? "OK" : "FAILED") : "UNKNOWN");
-    sendMessage("status/windvane", 0, false, !windvane_status.isInitDone() || windvane_status.isFail() ? "FAILED" : "OK");
+    sendMessage("status/windvane", 0, false, _sensorHub ? (_sensorHub->isWindVaneReady() ? "OK" : "FAILED") : "UNKNOWN");
 }
 
 void MqttWeatherClient::mqttConnected(bool sessionPresent) {
@@ -111,10 +108,10 @@ void MqttWeatherClient::mqttMessage(char* topic, char* payload,
     if (_sensorHub) _sensorHub->resetRainLevel();
   }
   if (sendWindSpeed == topic || sendAll == topic) {
-    resetWindSpeed();
+    if (_sensorHub) _sensorHub->resetWindSpeed();
   }
   if (sendWindDirection == topic || sendAll == topic) {
-    resetWindDirection();
+    if (_sensorHub) _sensorHub->resetWindDirection();
   }
   if (sendStatus == topic) {
     mqttSendStatus(nullptr);

@@ -1,6 +1,5 @@
 #include "SensorHub.hpp"
-
-#include "main.h"
+#include "MqttWeatherClient.hpp"
 #include <functional>
 #include <float.h>
 
@@ -11,7 +10,8 @@ SensorHub::SensorHub(Basecamp *iot, MqttWeatherClient *mqtt) :
     _bmp280_list(), _si7021_list(), _tsl2591_list(),
     _raingauge_list(), _anenometer_list(), _windvane_list(),
     _last_temperature(NAN), _last_pressure(NAN), _last_humidity(NAN),
-    _last_luminosity(NAN), _last_rainlevel(NAN) {
+    _last_luminosity(NAN), _last_rainlevel(NAN), _last_windspeed(NAN),
+    _last_winddirection(WD_UNKNOWN) {
   mqtt->setSensors(this);
 }
 
@@ -75,6 +75,18 @@ bool SensorHub::setupRainGauge(RainGauge *raingauge) {
   return setupSensor(_raingauge_list, raingauge, "Rain Gauge", beginFunc);
 }
 
+bool SensorHub::setupAnenometer(Anenometer *anenometer) {
+  std::function<bool()> beginFunc = std::bind(&Anenometer::begin, anenometer);
+
+  return setupSensor(_anenometer_list, anenometer, "Anenometer", beginFunc);
+}
+
+bool SensorHub::setupWindVane(WindVane *windvane) {
+  std::function<bool()> beginFunc = std::bind(&WindVane::begin, windvane);
+
+  return setupSensor(_windvane_list, windvane, "Wine Vane", beginFunc);
+}
+
 
 template <class T>
 bool SensorHub::isSensorsReady(std::vector<Sensor<T>>& sensor_list) {
@@ -100,6 +112,14 @@ bool SensorHub::isTsl2591Ready(void) {
 
 bool SensorHub::isRainGaugeReady(void) {
   return isSensorsReady(_raingauge_list);
+}
+
+bool SensorHub::isAnenometerReady(void) {
+  return isSensorsReady(_anenometer_list);
+}
+
+bool SensorHub::isWindVaneReady(void) {
+  return isSensorsReady(_windvane_list);
 }
 
 
@@ -134,6 +154,14 @@ void SensorHub::prepareTsl2591(void) {
 
 void SensorHub::prepareRainGauge(void) {
   prepareSensors(_raingauge_list);
+}
+
+void SensorHub::prepareAnenometer(void) {
+  prepareSensors(_anenometer_list);
+}
+
+void SensorHub::prepareWindVane(void) {
+  prepareSensors(_windvane_list);
 }
 
 
@@ -228,7 +256,7 @@ float SensorHub::readPressure(void) {
   pressure /= sources;
 
   if (isnan(_last_pressure) || abs(_last_pressure - pressure) > _MIN_DELTA_PRESSURE) {
-    if (mqttClient.sendMessage("pressure", 1, false, (String)pressure)) {
+    if (_mqtt->sendMessage("pressure", 1, false, (String)pressure)) {
       Serial.print("Pressure published: "); Serial.println(pressure);
       _last_pressure = pressure;
     } else {
@@ -266,7 +294,7 @@ float SensorHub::readHumidity(void) {
   humidity /= sources;
 
   if (isnan(_last_humidity) || abs(_last_humidity - humidity) > _MIN_DELTA_HUMIDITY) {
-    if (mqttClient.sendMessage("humidity", 1, false, (String)humidity)) {
+    if (_mqtt->sendMessage("humidity", 1, false, (String)humidity)) {
       Serial.print("Humidity published: "); Serial.println(humidity);
       _last_humidity = humidity;
     } else {
@@ -318,7 +346,7 @@ float SensorHub::readLuminosity(void) {
   luminosity /= sources;
 
   if (isnan(_last_luminosity) || abs(_last_luminosity - luminosity) > _MIN_DELTA_LUMINOSITY || (luminosity == 0 && _last_luminosity != 0)) {
-    if (mqttClient.sendMessage("luminosity", 1, false, (String)luminosity)) {
+    if (_mqtt->sendMessage("luminosity", 1, false, (String)luminosity)) {
       Serial.print("Luminosity published: "); Serial.println(luminosity);
       _last_luminosity = luminosity;
     } else {
@@ -359,7 +387,7 @@ float SensorHub::readRainLevel(void) {
   rainlevel /= sources;
 
   if (isnan(_last_rainlevel) || abs(_last_rainlevel - rainlevel) > _MIN_DELTA_RAIN_LEVEL || (rainlevel == 0 && _last_rainlevel != 0)) {
-    if (mqttClient.sendMessage("rain", 1, false, (String)rainlevel)) {
+    if (_mqtt->sendMessage("rain", 1, false, (String)rainlevel)) {
       Serial.print("Rain level published: "); Serial.println(rainlevel);
       _last_rainlevel = rainlevel;
     } else {
@@ -368,6 +396,101 @@ float SensorHub::readRainLevel(void) {
   }
 
   return _last_rainlevel;
+}
+
+
+float SensorHub::readWindSpeed(void) {
+  float windspeed = 0;
+  uint8_t sources = 0;
+
+  for (uint8_t i=0; i<_anenometer_list.size(); i++) {
+    Sensor<Anenometer> sensor = _anenometer_list[i];
+
+    if (!sensor.status->isInitDone()) continue;
+
+    float value = sensor.sensor->getWindSpeed();
+    if (isnan(value)) {
+      sensor.status->fail();
+    } else {
+      sensor.status->recover();
+      windspeed += value;
+      sources++;
+    }
+  }
+
+  if (sources == 0) {
+    resetWindSpeed();
+    return NAN;
+  }
+
+  windspeed /= sources;
+
+  if (isnan(_last_windspeed) || abs(_last_windspeed - windspeed) > _MIN_DELTA_WIND_SPEED || (windspeed == 0 && _last_windspeed != 0)) {
+    if (_mqtt->sendMessage("wind/speed", 1, false, (String)windspeed)) {
+      Serial.print("Wind speed published: ");
+      Serial.println(windspeed);
+      _last_windspeed = windspeed;
+    } else {
+      Serial.println("Couldn't publish wind speed");
+    }
+  }
+
+  return _last_windspeed;
+}
+
+wind_direction_t SensorHub::readWindDirection(void) {
+  std::vector<uint8_t> directions;
+  uint8_t max_value = WD_UNKNOWN;
+  uint8_t sources = 0;
+
+  for (uint8_t i = 0; i<_windvane_list.size(); i++) {
+    Sensor<WindVane> sensor = _windvane_list[i];
+
+    if (!sensor.status->isInitDone()) continue;
+
+    uint8_t value = sensor.sensor->getWindDirection();
+    if (value == WD_UNKNOWN) {
+      sensor.status->fail();
+    } else {
+      sensor.status->recover();
+      if (value > max_value || sources == 0) {
+        if (sources > 0) directions.push_back(max_value);
+        max_value = value;
+      } else {
+        directions.push_back(value);
+      }
+      sources++;
+    }
+  }
+
+  if (sources == 0) {
+    resetWindDirection();
+    return WD_UNKNOWN;
+  }
+
+  int16_t delta = 0;
+  for (uint8_t i=0; i<directions.size(); i++) {
+    uint8_t value = directions[i];
+    if (abs(value - max_value) < abs(value + 16 - max_value)) {
+      delta += (value - max_value);
+    } else {
+      delta += (value + 16 - max_value);
+    }
+  }
+
+  wind_direction_t winddirection = static_cast<wind_direction_t>((uint8_t)(max_value + 16 + round(delta / sources)) % 16);
+
+  if (_last_winddirection == WD_UNKNOWN || _last_winddirection != winddirection) {
+    if (_mqtt->sendMessage("wind/direction", 1, false, WindVane::translateWindDirection(winddirection))) {
+      Serial.print("Wind direction published: ");
+      Serial.println(winddirection);
+      _last_winddirection = winddirection;
+    } else {
+      Serial.println("Couldn't publish wind direction");
+    }
+  }
+
+  return _last_winddirection;
 }
 
 
@@ -391,65 +514,10 @@ void SensorHub::resetRainLevel(void) {
   _last_rainlevel = NAN;
 }
 
-/*void setupBasecamp(Basecamp *iot) {
-  if (iot->begin()) {
-    iot_status.initDone();
-
-    iot->web.addInterfaceElement("device_id", "input", "Device ID", "#configform", "DeviceId");
-    iot->web.setInterfaceElementAttribute("device_id", "type", "text");
-  } else {
-    iot_status.fail("Basecamp init failed");
-  }
+void SensorHub::resetWindSpeed(void) {
+  _last_windspeed = NAN;
 }
 
-
-void setupBmp280(void) {
-  if (bmp280.begin()) {
-    bmp280_status.initDone();
-  } else {
-    bmp280_status.fail("Unable to find BMP280 sensor");
-  }
-}
-
-void setupSi7021(void) {
-  if (si7021.begin()) {
-    si7021_status.initDone();
-  } else {
-    si7021_status.fail("Unable to find SI7021 sensor");
-  }
-}
-
-void setupTsl2591(void) {
-  if (tsl2591.begin()) {
-    tsl2591_status.initDone();
-    tsl2591.setGain(TSL2591_GAIN_MED);
-    tsl2591.setTiming(TSL2591_INTEGRATIONTIME_300MS);
-  } else {
-    tsl2591_status.fail("Unable to find TSL2591 sensor");
-  }
-}
-
-void setupRainGauge(void) {
-  if (rainGauge.begin()) {
-    rainGauge_status.initDone();
-  } else {
-    rainGauge_status.fail("Unable to initialize rain gauge");
-  }
-}*/
-
-void setupAnenometer(void) {
-  if (anenometer.begin()) {
-    anenometer_status.initDone();
-    anenometer.setStormWarning(storm_warning, 20);
-  } else {
-    anenometer_status.fail("Unable to initialize anenometer");
-  }
-}
-
-void setupWindVane(void) {
-  if (windVane.begin()) {
-    windvane_status.initDone();
-  } else {
-    windvane_status.fail("Unable to initialize wind vane");
-  }
+void SensorHub::resetWindDirection(void) {
+  _last_winddirection = WD_UNKNOWN;
 }

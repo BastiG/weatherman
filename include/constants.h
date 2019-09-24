@@ -20,6 +20,9 @@
 #define _MIN_DELTA_RAIN_LEVEL   1       // report rain level after change of 1 mm/h
 
 
+#define WIND_WARNING_SPEED      30      // warn for wind speeds > 30 km/h
+
+
 #define MQTT_MAIN_TOPIC  "weatherman"
 #define CONFIG_DEVICE_ID "DeviceId"
 
