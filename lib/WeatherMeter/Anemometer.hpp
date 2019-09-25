@@ -29,8 +29,8 @@ class Anenometer {
         ulong _last_sample_requested;
 
         float _warn_threshold;
-        float _storm_warned;
-        void (*_storm_warning)(float);
+        float _wind_warned;
+        void (*_wind_warning)(float);
 
     public:
         Anenometer(uint8_t pin, bool high_active = false);
@@ -38,7 +38,7 @@ class Anenometer {
         bool begin(void);
         float getWindSpeed(void);
 
-        void setStormWarning(void (*storm_warning)(float), float warn_threshold);
+        void setWindWarning(void (*wind_warning)(float), float warn_threshold);
 };
 
 #endif
