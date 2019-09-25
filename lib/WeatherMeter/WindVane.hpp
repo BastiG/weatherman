@@ -9,23 +9,23 @@
 #define NO_OF_SAMPLES   16
 
 typedef enum {
-    WD_UNKNOWN,
-    WD_N,
-    WD_NNE,
-    WD_NE,
-    WD_ENE,
-    WD_E,
-    WD_ESE,
-    WD_SE,
-    WD_SSE,
-    WD_S,
-    WD_SSW,
-    WD_SW,
-    WD_WSW,
-    WD_W,
-    WD_WNW,
-    WD_NW,
-    WD_NNW
+    WD_N    = (0),
+    WD_NNE  = (1),
+    WD_NE   = (2),
+    WD_ENE  = (3),
+    WD_E    = (4),
+    WD_ESE  = (5),
+    WD_SE   = (6),
+    WD_SSE  = (7),
+    WD_S    = (8),
+    WD_SSW  = (9),
+    WD_SW   = (10),
+    WD_WSW  = (11),
+    WD_W    = (12),
+    WD_WNW  = (13),
+    WD_NW   = (14),
+    WD_NNW  = (15),
+    WD_UNKNOWN = (255)
 } wind_direction_t ;
 
 class WindVane {
