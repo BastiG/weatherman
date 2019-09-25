@@ -5,8 +5,8 @@
 
 const String MqttWeatherClient::MAIN_TOPIC = MQTT_MAIN_TOPIC;
 
-MqttWeatherClient::MqttWeatherClient(AsyncMqttClient* mqtt, Configuration* configuration) :
-        _mqtt_failed(0), _mqtt(mqtt), _id("0") {
+MqttWeatherClient::MqttWeatherClient(AsyncMqttClient *mqtt, Configuration *configuration) :
+        _mqtt_failed(0), _mqtt(mqtt), _configuration(configuration), _id("0") {
     Serial.println("MqttWeatherClient constructor called");
 
     using namespace std::placeholders;
@@ -18,24 +18,12 @@ MqttWeatherClient::MqttWeatherClient(AsyncMqttClient* mqtt, Configuration* confi
     _mqtt->onSubscribe(std::bind(&MqttWeatherClient::mqttSubscribed, this, _1, _2));
     _mqtt->onMessage(std::bind(&MqttWeatherClient::mqttMessage, this, _1, _2, _3, _4, _5, _6));
     _mqtt->onPublish(std::bind(&MqttWeatherClient::mqttPublished, this, _1));
-
-    if (configuration->keyExists(CONFIG_DEVICE_ID)) {
-      _id = configuration->get(CONFIG_DEVICE_ID);
-    }
-}
-
-void MqttWeatherClient::setDeviceId(String id) {
-    _id = id;
-
-    messageCallbacks.clear();
-    messageCallbacks[MAIN_TOPIC + "/send/" + _id + "/status"] = std::vector<void (MqttWeatherClient::*)(char*)> { &MqttWeatherClient::mqttSendStatus };
-    messageCallbacks[MAIN_TOPIC + "/send/*/status"] = std::vector<void (MqttWeatherClient::*)(char*)> { &MqttWeatherClient::mqttSendStatus };
-
-    _mqtt->disconnect(true);
 }
 
 void MqttWeatherClient::mqttSendStatus(char* payload) {
     sendMessage("status/uptime", 0, false, String(millis()));
+
+    // TODO want to see individual sensor states? rather than "is one out of all still working"
     sendMessage("status/bmp280", 0, false, _sensorHub ? (_sensorHub->isBmp280Ready() ? "OK" : "FAILED") : "UNKNOWN");
     sendMessage("status/tsl2591", 0, false, _sensorHub ? (_sensorHub->isTsl2591Ready() ? "OK" : "FAILED") : "UNKNOWN");
     sendMessage("status/si7021", 0, false, _sensorHub ? (_sensorHub->isSi7021Ready() ? "OK" : "FAILED") : "UNKNOWN");
@@ -45,12 +33,49 @@ void MqttWeatherClient::mqttSendStatus(char* payload) {
     sendMessage("status/windvane", 0, false, _sensorHub ? (_sensorHub->isWindVaneReady() ? "OK" : "FAILED") : "UNKNOWN");
 }
 
+void MqttWeatherClient::registerCallback(String topic, mqtt_callback_t callback) {
+  std::vector<String> topics = {
+    MqttWeatherClient::MAIN_TOPIC + "/send/" + _id + "/" + topic,
+    MqttWeatherClient::MAIN_TOPIC + "/send/*/" + topic,
+    MqttWeatherClient::MAIN_TOPIC + "/send/" + _id + "/*",
+    MqttWeatherClient::MAIN_TOPIC + "/send/*/*"
+  };
+
+  for (uint8_t i=0; i<topics.size(); i++) {
+    if (messageCallbacks.find(topics[i]) == messageCallbacks.end()) {
+      messageCallbacks[topics[i]] = std::vector<mqtt_callback_t> { callback };
+    } else {
+      messageCallbacks[topics[i]].push_back(callback);
+    }
+  }
+}
+
+void MqttWeatherClient::sensorCallback(void (SensorHub::*sensorFunc)(void), char* payload) {
+  if (_sensorHub) {
+    (_sensorHub->*sensorFunc)();
+  }
+}
+
 void MqttWeatherClient::mqttConnected(bool sessionPresent) {
-  Serial.print("MQTT connected - ");
-  Serial.println(sessionPresent);
+  Serial.print("MQTT connected - sessionPresent="); Serial.println(sessionPresent);
+
+  if (_configuration->keyExists(CONFIG_DEVICE_ID)) {
+    _id = _configuration->get(CONFIG_DEVICE_ID);
+  }
+
   _mqtt->subscribe((MAIN_TOPIC + "/send/" + _id + "/#").c_str(),2);
   _mqtt->subscribe((MAIN_TOPIC + "/send/*/#").c_str(),2);
   _mqtt->publish((MAIN_TOPIC + "/status/online/" + _id).c_str(), 1, true, String(millis()).c_str());
+
+  messageCallbacks.clear();
+  registerCallback("status", [](MqttWeatherClient *client, char *payload) { client->mqttSendStatus(payload); });
+  registerCallback("temperature", [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetTemperature, payload); });
+  registerCallback("luminosity", [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetLuminosity, payload); });
+  registerCallback("humidity", [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetHumidity, payload); });
+  registerCallback("pressure", [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetPressure, payload); });
+  registerCallback("rainlevel", [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetRainLevel, payload); });
+  registerCallback("speed", [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetWindSpeed, payload); });
+  registerCallback("wind/direction", [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetWindDirection, payload); });
 }
 
 void MqttWeatherClient::mqttDisconnected(AsyncMqttClientDisconnectReason reason) {
@@ -64,62 +89,26 @@ void MqttWeatherClient::mqttSubscribed(uint16_t packetId, uint8_t qos) {
 void MqttWeatherClient::mqttMessage(char* topic, char* payload,
   AsyncMqttClientMessageProperties properties,
   size_t len, size_t index, size_t total) {
-  Serial.print("[MQTT] Topic: ");
-  Serial.println(topic);
-  Serial.print("[MQTT] Payload: ");
-  Serial.println(payload);
+  Serial.print("[MQTT] Topic: "); Serial.println(topic);
+#ifdef DEBUG
+  Serial.print("[MQTT] Payload: "); Serial.println(payload);
+#endif
 
-  Serial.print("Message callback: "); Serial.println(messageCallbacks.size());
-
-  std::map<String, std::vector<void (MqttWeatherClient::*)(char*)>>::iterator it;
-  for (it = messageCallbacks.begin(); it != messageCallbacks.end(); ++it) {
-      Serial.print(" -> "); Serial.println(it->first);
-  }
+  std::map<String, std::vector<mqtt_callback_t>>::iterator it;
   it = messageCallbacks.find(String(topic));
   if (it != messageCallbacks.end()) {
-      (this->*(it->second[0]))(payload);
+    for (uint8_t i=0; i<it->second.size(); i++) {
+      it->second[i](this, payload);
+    }
   } else {
-      Serial.println("[MQTT] No suitable message callback found for topic");
-  }
-  
-  String sendTemperature = MAIN_TOPIC + "/send/temperature";
-  String sendLuminosity = MAIN_TOPIC + "/send/luminosity";
-  String sendHumidity = MAIN_TOPIC + "/send/humidity";
-  String sendPressure = MAIN_TOPIC + "/send/pressure";
-  String sendRain = MAIN_TOPIC + "/send/rain";
-  String sendWindSpeed = MAIN_TOPIC + "/send/wind/speed";
-  String sendWindDirection = MAIN_TOPIC + "/send/wind/direction";
-  String sendAll = MAIN_TOPIC + "/send/all";
-  String sendStatus = MAIN_TOPIC + "/send/status";
-  
-  if (sendTemperature == topic || sendAll == topic) {
-    if (_sensorHub) _sensorHub->resetTemperature();
-  }
-  if (sendLuminosity == topic || sendAll == topic) {
-    if (_sensorHub) _sensorHub->resetLuminosity();
-  }
-  if (sendHumidity == topic || sendAll == topic) {
-    if (_sensorHub) _sensorHub->resetHumidity();
-  }
-  if (sendPressure == topic || sendAll == topic) {
-    if (_sensorHub) _sensorHub->resetPressure();
-  }
-  if (sendRain == topic || sendAll == topic) {
-    if (_sensorHub) _sensorHub->resetRainLevel();
-  }
-  if (sendWindSpeed == topic || sendAll == topic) {
-    if (_sensorHub) _sensorHub->resetWindSpeed();
-  }
-  if (sendWindDirection == topic || sendAll == topic) {
-    if (_sensorHub) _sensorHub->resetWindDirection();
-  }
-  if (sendStatus == topic) {
-    mqttSendStatus(nullptr);
+      Serial.println("[MQTT] No message callback handler for topic");
   }
 }
 
 void MqttWeatherClient::mqttPublished(uint16_t packetId) {
+#ifdef DEBUG
   Serial.println("MQTT message published");
+#endif
 }
 
 bool MqttWeatherClient::sendMessage(String type, int qos, bool persistent, String payload) {
@@ -145,10 +134,6 @@ bool MqttWeatherClient::sendMessage(String type, int qos, bool persistent, Strin
   } else {
     return false;
   }
-}
-
-String MqttWeatherClient::getId(void) {
-  return _id;
 }
 
 void MqttWeatherClient::setSensors(SensorHub *sensorHub) {

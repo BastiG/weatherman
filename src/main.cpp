@@ -42,7 +42,7 @@ void setup() {
   sensors.setupWindVane(&windVane);
   anenometer.setWindWarning(wind_warning, WIND_WARNING_SPEED);
 
-  Serial.println("Init complete, ID=" + mqttClient.getId());
+  Serial.println("Init complete");
 
   sensors.resetTemperature();
   sensors.resetLuminosity();

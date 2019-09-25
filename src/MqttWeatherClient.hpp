@@ -7,7 +7,10 @@
 
 extern "C" {
   class SensorHub;
+  class MqttWeatherClient;
 }
+
+typedef void (*mqtt_callback_t)(MqttWeatherClient*, char*);
 
 class MqttWeatherClient {
   private:
@@ -21,21 +24,24 @@ class MqttWeatherClient {
       size_t len, size_t index, size_t total);
     void mqttPublished(uint16_t packetId);
 
-    std::map<String, std::vector<void (MqttWeatherClient::*)(char*)>> messageCallbacks;
+    void registerCallback(String topic, mqtt_callback_t callback);
+    void sensorCallback(void (SensorHub::*sensorFunc)(void), char *callback);
+
+    std::map<String, std::vector<mqtt_callback_t>> messageCallbacks;
 
     uint8_t _mqtt_failed;
     AsyncMqttClient* _mqtt;
-    String _id;
 
     SensorHub *_sensorHub;
+    Configuration *_configuration;
+
+    String _id;
 
     void mqttSendStatus(char* payload);
 
   public:
-    MqttWeatherClient(AsyncMqttClient* client, Configuration* configuration);
-    void setDeviceId(String id);
+    MqttWeatherClient(AsyncMqttClient *client, Configuration *configuration);
     bool sendMessage(String type, int qos, bool persistent, String payload);
-    String getId(void);
 
     void setSensors(SensorHub *sensorHub);
 };
