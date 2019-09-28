@@ -33,13 +33,15 @@ void MqttWeatherClient::mqttSendStatus(char* payload) {
     sendMessage("status/windvane", 0, false, _sensorHub ? (_sensorHub->isWindVaneReady() ? "OK" : "FAILED") : "UNKNOWN");
 }
 
-void MqttWeatherClient::registerCallback(String topic, mqtt_callback_t callback) {
+void MqttWeatherClient::registerCallback(String topic, bool register_wildcard, mqtt_callback_t callback) {
   std::vector<String> topics = {
     MqttWeatherClient::MAIN_TOPIC + "/send/" + _id + "/" + topic,
-    MqttWeatherClient::MAIN_TOPIC + "/send/*/" + topic,
-    MqttWeatherClient::MAIN_TOPIC + "/send/" + _id + "/*",
-    MqttWeatherClient::MAIN_TOPIC + "/send/*/*"
+    MqttWeatherClient::MAIN_TOPIC + "/send/*/" + topic
   };
+  if (register_wildcard) {
+    topics.push_back(MqttWeatherClient::MAIN_TOPIC + "/send/" + _id + "/*");
+    topics.push_back(MqttWeatherClient::MAIN_TOPIC + "/send/*/*");
+  }
 
   for (uint8_t i=0; i<topics.size(); i++) {
     if (messageCallbacks.find(topics[i]) == messageCallbacks.end()) {
@@ -68,14 +70,13 @@ void MqttWeatherClient::mqttConnected(bool sessionPresent) {
   _mqtt->publish((MAIN_TOPIC + "/status/online/" + _id).c_str(), 1, true, String(millis()).c_str());
 
   messageCallbacks.clear();
-  registerCallback("status", [](MqttWeatherClient *client, char *payload) { client->mqttSendStatus(payload); });
-  registerCallback("temperature", [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetTemperature, payload); });
-  registerCallback("luminosity", [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetLuminosity, payload); });
-  registerCallback("humidity", [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetHumidity, payload); });
-  registerCallback("pressure", [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetPressure, payload); });
-  registerCallback("rainlevel", [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetRainLevel, payload); });
-  registerCallback("speed", [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetWindSpeed, payload); });
-  registerCallback("wind/direction", [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetWindDirection, payload); });
+  registerCallback("status", false, [](MqttWeatherClient *client, char *payload) { client->mqttSendStatus(payload); });
+  registerCallback("temperature", true, [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetTemperature, payload); });
+  registerCallback("luminosity", true, [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetLuminosity, payload); });
+  registerCallback("humidity", true, [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetHumidity, payload); });
+  registerCallback("pressure", true, [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetPressure, payload); });
+  registerCallback("rainlevel", true, [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetRain, payload); });
+  registerCallback("wind", true, [](MqttWeatherClient *client, char *payload) { client->sensorCallback(&SensorHub::resetWind, payload); });
 }
 
 void MqttWeatherClient::mqttDisconnected(AsyncMqttClientDisconnectReason reason) {

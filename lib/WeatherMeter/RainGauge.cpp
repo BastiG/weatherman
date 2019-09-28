@@ -7,7 +7,7 @@ extern "C"
 
 RainGauge::RainGauge(uint8_t pin, bool high_active) :
     _pin(pin), _high_active(high_active),
-    _last_reading(0), _index_reading(0) {
+    _last_reading(millis() + 1000), _index_reading(0) {
 }
 
 RainGauge::~RainGauge() {

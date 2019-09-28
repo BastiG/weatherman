@@ -24,7 +24,7 @@ MqttWeatherClient mqttClient(&iot.mqtt, &iot.configuration);
 SensorHub sensors(&iot, &mqttClient);
 
 
-void wind_warning(float wind_speed) {
+void wind_warning_callback(float wind_speed) {
   mqttClient.sendMessage("wind/warning", 0, false, (String)wind_speed);
 }
 
@@ -40,7 +40,14 @@ void setup() {
   sensors.setupRainGauge(&rainGauge);
   sensors.setupAnenometer(&anenometer);
   sensors.setupWindVane(&windVane);
-  anenometer.setWindWarning(wind_warning, WIND_WARNING_SPEED);
+
+  uint8_t wind_warning = DEFAULT_WIND_WARNING;
+  if (iot.configuration.keyExists(CONFIG_WIND_WARNING)) {
+    wind_warning = (uint8_t)std::atoi(iot.configuration.get(CONFIG_WIND_WARNING).c_str());
+  }
+  if (wind_warning) {
+    anenometer.setWindWarning(wind_warning_callback, wind_warning);
+  }
 
   Serial.println("Init complete");
 
@@ -48,9 +55,8 @@ void setup() {
   sensors.resetLuminosity();
   sensors.resetPressure();
   sensors.resetHumidity();
-  sensors.resetRainLevel();
-  sensors.resetWindSpeed();
-  sensors.resetWindDirection();
+  sensors.resetRain();
+  sensors.resetWind();
 }
 
 void loop() {
@@ -74,9 +80,8 @@ void loop() {
     sensors.readPressure();
     sensors.readLuminosity();
     sensors.readHumidity();
-    sensors.readRainLevel();
-    sensors.readWindSpeed();
-    sensors.readWindDirection();
+    sensors.readRain();
+    sensors.readWind();
   }
 
   digitalWrite(PIN_LED, LOW);

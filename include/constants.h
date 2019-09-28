@@ -20,10 +20,12 @@
 #define _MIN_DELTA_RAIN_LEVEL   1       // report rain level after change of 1 mm/h
 
 
-#define WIND_WARNING_SPEED      30      // warn for wind speeds > 30 km/h
+#define DEFAULT_WIND_WARNING    30      // warn for wind speeds > 30 km/h
+#define DEFAULT_BEACON_TIMEOUT  5*60*1000  // publish every 5 minutes
 
-
-#define MQTT_MAIN_TOPIC  "weatherman"
-#define CONFIG_DEVICE_ID "DeviceId"
+#define MQTT_MAIN_TOPIC         "weatherman"
+#define CONFIG_DEVICE_ID        "DeviceId"
+#define CONFIG_WIND_WARNING     "WindWarning"
+#define CONFIG_BEACON_TIMEOUT   "BeaconTimeout"
 
 #endif

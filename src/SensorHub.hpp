@@ -42,12 +42,23 @@ class SensorHub{
         float _last_windspeed;
         wind_direction_t _last_winddirection;
 
+        ulong _last_temperature_time;
+        ulong _last_pressure_time;
+        ulong _last_humidity_time;
+        ulong _last_luminosity_time;
+        ulong _last_rainlevel_time;
+        ulong _last_wind_time;
+
+        ulong _beacon_timeout;
+
         template <class T>
         bool setupSensor(std::vector<Sensor<T>>& sensor_list, T *device, String deviceName, std::function<bool(void)> beginFunc);
         template <class T>
         void prepareSensors(std::vector<Sensor<T>>& sensor_list);
         template <class T>
         bool isSensorsReady(std::vector<Sensor<T>>& sensor_list);
+
+        wind_direction_t getWindDirection(void);
     public:
         SensorHub(Basecamp *iot, MqttWeatherClient *mqtt);
 
@@ -79,17 +90,15 @@ class SensorHub{
         float readPressure(void);
         float readHumidity(void);
         float readLuminosity(void);
-        float readRainLevel(void);
-        float readWindSpeed(void);
-        wind_direction_t readWindDirection(void);
+        float readRain(void);
+        float readWind(void);
 
         void resetTemperature(void);
         void resetPressure(void);
         void resetHumidity(void);
         void resetLuminosity(void);
-        void resetRainLevel(void);
-        void resetWindSpeed(void);
-        void resetWindDirection(void);
+        void resetRain(void);
+        void resetWind(void);
 };
 
 #endif

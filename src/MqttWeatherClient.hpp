@@ -24,7 +24,7 @@ class MqttWeatherClient {
       size_t len, size_t index, size_t total);
     void mqttPublished(uint16_t packetId);
 
-    void registerCallback(String topic, mqtt_callback_t callback);
+    void registerCallback(String topic, bool register_wildcard, mqtt_callback_t callback);
     void sensorCallback(void (SensorHub::*sensorFunc)(void), char *callback);
 
     std::map<String, std::vector<mqtt_callback_t>> messageCallbacks;

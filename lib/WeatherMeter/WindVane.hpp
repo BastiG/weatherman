@@ -40,7 +40,8 @@ class WindVane {
         wind_direction_t getWindDirection(void);
     
     public:
-        static String translateWindDirection(wind_direction_t wd);
+        static String toName(wind_direction_t wd);
+        static float toDegrees(wind_direction_t wd);
 };
 
 #endif

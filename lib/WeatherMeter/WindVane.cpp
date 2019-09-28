@@ -122,7 +122,7 @@ wind_direction_t WindVane::getWindDirection(void) {
 }
 
 
-String WindVane::translateWindDirection(wind_direction_t wd) {
+String WindVane::toName(wind_direction_t wd) {
     switch (wd) {
         case WD_N:      return "N";
         case WD_NNE:    return "NNE";
@@ -143,4 +143,9 @@ String WindVane::translateWindDirection(wind_direction_t wd) {
         case WD_UNKNOWN:
         default:        return "?";
     }
+}
+
+float WindVane::toDegrees(wind_direction_t wd) {
+    if (wd == WD_UNKNOWN) return NAN;
+    return 360.0/16 * (uint8_t)wd;
 }

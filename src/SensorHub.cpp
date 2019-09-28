@@ -11,16 +11,30 @@ SensorHub::SensorHub(Basecamp *iot, MqttWeatherClient *mqtt) :
     _raingauge_list(), _anenometer_list(), _windvane_list(),
     _last_temperature(NAN), _last_pressure(NAN), _last_humidity(NAN),
     _last_luminosity(NAN), _last_rainlevel(NAN), _last_windspeed(NAN),
-    _last_winddirection(WD_UNKNOWN) {
+    _last_winddirection(WD_UNKNOWN),
+    _last_temperature_time(0), _last_pressure_time(0), _last_humidity_time(0),
+    _last_luminosity_time(0), _last_rainlevel_time(0), _last_wind_time(0) {
   mqtt->setSensors(this);
+
+  if (_iot->configuration.keyExists(CONFIG_BEACON_TIMEOUT)) {
+    _beacon_timeout = std::strtoul(_iot->configuration.get(CONFIG_BEACON_TIMEOUT).c_str(), nullptr, 10);
+  } else {
+    _beacon_timeout = DEFAULT_BEACON_TIMEOUT;
+  }
 }
 
 void SensorHub::setupBasecamp(void) {
   if (_iot->begin()) {
     _iot_status.initDone();
 
-    _iot->web.addInterfaceElement("device_id", "input", "Device ID", "#configform", "DeviceId");
+    _iot->web.addInterfaceElement("device_id", "input", "Device ID", "#configform", CONFIG_DEVICE_ID);
     _iot->web.setInterfaceElementAttribute("device_id", "type", "text");
+
+    _iot->web.addInterfaceElement("wind_warning", "input", "Wind Warning", "#configform", CONFIG_WIND_WARNING);
+    _iot->web.setInterfaceElementAttribute("wind_warning", "type", "number");
+
+    _iot->web.addInterfaceElement("beacon_timeout", "input", "Beacon Timeout", "#configform", CONFIG_BEACON_TIMEOUT);
+    _iot->web.setInterfaceElementAttribute("beacon_timeout", "type", "number");
   } else {
     _iot_status.fail("Basecamp init failed");
   }
@@ -168,6 +182,7 @@ void SensorHub::prepareWindVane(void) {
 float SensorHub::readTemperature(void) {
   float temperature = 0;
   uint8_t sources = 0;
+  ulong now = millis();
 
   for (uint8_t i = 0; i<_bmp280_list.size(); i++) {
     Sensor<Adafruit_BMP280> sensor = _bmp280_list[i];
@@ -210,10 +225,12 @@ float SensorHub::readTemperature(void) {
   
   temperature /= sources;
 
-  if (isnan(_last_temperature) || abs(_last_temperature - temperature) > _MIN_DELTA_TEMPERATURE) {
+  if (isnan(_last_temperature) || abs(_last_temperature - temperature) > _MIN_DELTA_TEMPERATURE ||
+      (_beacon_timeout && now - _last_temperature_time > _beacon_timeout)) {
     if (_mqtt->sendMessage("temperature", 1, false, (String)temperature)) {
       Serial.print("Temperature published: "); Serial.println(temperature);
       _last_temperature = temperature;
+      _last_temperature_time = now;
     } else {
       //lastTemperature = -100.0;
       Serial.println("Couldn't publish temperature");
@@ -226,6 +243,7 @@ float SensorHub::readTemperature(void) {
 float SensorHub::readPressure(void) {
   float pressure = 0;
   uint8_t sources = 0;
+  ulong now = millis();
 
   for (uint8_t i = 0; i<_bmp280_list.size(); i++) {
     Sensor<Adafruit_BMP280> sensor = _bmp280_list[i];
@@ -255,10 +273,12 @@ float SensorHub::readPressure(void) {
 
   pressure /= sources;
 
-  if (isnan(_last_pressure) || abs(_last_pressure - pressure) > _MIN_DELTA_PRESSURE) {
+  if (isnan(_last_pressure) || abs(_last_pressure - pressure) > _MIN_DELTA_PRESSURE ||
+      (_beacon_timeout && now - _last_pressure_time > _beacon_timeout)) {
     if (_mqtt->sendMessage("pressure", 1, false, (String)pressure)) {
       Serial.print("Pressure published: "); Serial.println(pressure);
       _last_pressure = pressure;
+      _last_pressure_time = now;
     } else {
       //lastPressure = -100.0;
       Serial.println("Couldn't publish pressure");
@@ -271,6 +291,7 @@ float SensorHub::readPressure(void) {
 float SensorHub::readHumidity(void) {
   float humidity = 0;
   uint8_t sources = 0;
+  ulong now = millis();
 
   for (uint8_t i = 0; i<_si7021_list.size(); i++) {
     Sensor<Adafruit_Si7021> sensor = _si7021_list[i];
@@ -293,10 +314,12 @@ float SensorHub::readHumidity(void) {
 
   humidity /= sources;
 
-  if (isnan(_last_humidity) || abs(_last_humidity - humidity) > _MIN_DELTA_HUMIDITY) {
+  if (isnan(_last_humidity) || abs(_last_humidity - humidity) > _MIN_DELTA_HUMIDITY ||
+      (_beacon_timeout && now - _last_humidity_time > _beacon_timeout)) {
     if (_mqtt->sendMessage("humidity", 1, false, (String)humidity)) {
       Serial.print("Humidity published: "); Serial.println(humidity);
       _last_humidity = humidity;
+      _last_humidity_time = now;
     } else {
       //lastHumidity = -100.0;
       Serial.println("Couldn't publish humidity");
@@ -309,6 +332,7 @@ float SensorHub::readHumidity(void) {
 float SensorHub::readLuminosity(void) {
   float luminosity = 0;
   uint8_t sources = 0;
+  ulong now = millis();
 
   for (uint8_t i = 0; i<_tsl2591_list.size(); i++) {
     Sensor<Adafruit_TSL2591> sensor = _tsl2591_list[i];
@@ -345,10 +369,12 @@ float SensorHub::readLuminosity(void) {
   }
   luminosity /= sources;
 
-  if (isnan(_last_luminosity) || abs(_last_luminosity - luminosity) > _MIN_DELTA_LUMINOSITY || (luminosity == 0 && _last_luminosity != 0)) {
+  if (isnan(_last_luminosity) || abs(_last_luminosity - luminosity) > _MIN_DELTA_LUMINOSITY || (luminosity == 0 && _last_luminosity != 0) ||
+      (_beacon_timeout && now - _last_luminosity_time > _beacon_timeout)) {
     if (_mqtt->sendMessage("luminosity", 1, false, (String)luminosity)) {
       Serial.print("Luminosity published: "); Serial.println(luminosity);
       _last_luminosity = luminosity;
+      _last_luminosity_time = now;
     } else {
       //lastLuminosity = -100.0;
       Serial.println("Couldn't publish luminosity");
@@ -358,9 +384,10 @@ float SensorHub::readLuminosity(void) {
   return _last_luminosity;
 }
 
-float SensorHub::readRainLevel(void) {
+float SensorHub::readRain(void) {
   float rainlevel = 0;
   uint8_t sources = 0;
+  ulong now = millis();
 
   for (uint8_t i=0; i<_raingauge_list.size(); i++) {
     Sensor<RainGauge> sensor = _raingauge_list[i];
@@ -380,16 +407,18 @@ float SensorHub::readRainLevel(void) {
   }
 
   if (sources == 0) {
-    resetRainLevel();
+    resetRain();
     return NAN;
   }
 
   rainlevel /= sources;
 
-  if (isnan(_last_rainlevel) || abs(_last_rainlevel - rainlevel) > _MIN_DELTA_RAIN_LEVEL || (rainlevel == 0 && _last_rainlevel != 0)) {
+  if (isnan(_last_rainlevel) || abs(_last_rainlevel - rainlevel) > _MIN_DELTA_RAIN_LEVEL || (rainlevel == 0 && _last_rainlevel != 0) ||
+      (_beacon_timeout && now - _last_rainlevel_time > _beacon_timeout)) {
     if (_mqtt->sendMessage("rain", 1, false, (String)rainlevel)) {
       Serial.print("Rain level published: "); Serial.println(rainlevel);
       _last_rainlevel = rainlevel;
+      _last_rainlevel_time = now;
     } else {
       Serial.println("Couldn't publish rain level");
     }
@@ -399,9 +428,10 @@ float SensorHub::readRainLevel(void) {
 }
 
 
-float SensorHub::readWindSpeed(void) {
+float SensorHub::readWind(void) {
   float windspeed = 0;
   uint8_t sources = 0;
+  ulong now = millis();
 
   for (uint8_t i=0; i<_anenometer_list.size(); i++) {
     Sensor<Anenometer> sensor = _anenometer_list[i];
@@ -419,17 +449,23 @@ float SensorHub::readWindSpeed(void) {
   }
 
   if (sources == 0) {
-    resetWindSpeed();
+    resetWind();
     return NAN;
   }
 
   windspeed /= sources;
 
-  if (isnan(_last_windspeed) || abs(_last_windspeed - windspeed) > _MIN_DELTA_WIND_SPEED || (windspeed == 0 && _last_windspeed != 0)) {
-    if (_mqtt->sendMessage("wind/speed", 1, false, (String)windspeed)) {
+  wind_direction_t winddirection = getWindDirection();
+
+  if (isnan(_last_windspeed) || abs(_last_windspeed - windspeed) > _MIN_DELTA_WIND_SPEED || (windspeed == 0 && _last_windspeed != 0) || winddirection != _last_winddirection ||
+      (_beacon_timeout && now - _last_wind_time > _beacon_timeout)) {
+    String message = "{\"speed\":" + String(windspeed) + ",\"degrees\":" + WindVane::toDegrees(winddirection) + ",\"direction\":\"" + WindVane::toName(winddirection) + "\"}";
+    if (_mqtt->sendMessage("wind", 1, false, message)) {
       Serial.print("Wind speed published: ");
       Serial.println(windspeed);
       _last_windspeed = windspeed;
+      _last_winddirection = winddirection;
+      _last_wind_time = now;
     } else {
       Serial.println("Couldn't publish wind speed");
     }
@@ -438,7 +474,7 @@ float SensorHub::readWindSpeed(void) {
   return _last_windspeed;
 }
 
-wind_direction_t SensorHub::readWindDirection(void) {
+wind_direction_t SensorHub::getWindDirection(void) {
   std::vector<uint8_t> directions;
   uint8_t max_value = WD_UNKNOWN;
   uint8_t sources = 0;
@@ -464,7 +500,7 @@ wind_direction_t SensorHub::readWindDirection(void) {
   }
 
   if (sources == 0) {
-    resetWindDirection();
+    resetWind();
     return WD_UNKNOWN;
   }
 
@@ -478,19 +514,7 @@ wind_direction_t SensorHub::readWindDirection(void) {
     }
   }
 
-  wind_direction_t winddirection = static_cast<wind_direction_t>((uint8_t)(max_value + 16 + round(delta / sources)) % 16);
-
-  if (_last_winddirection == WD_UNKNOWN || _last_winddirection != winddirection) {
-    if (_mqtt->sendMessage("wind/direction", 1, false, WindVane::translateWindDirection(winddirection))) {
-      Serial.print("Wind direction published: ");
-      Serial.println(winddirection);
-      _last_winddirection = winddirection;
-    } else {
-      Serial.println("Couldn't publish wind direction");
-    }
-  }
-
-  return _last_winddirection;
+  return static_cast<wind_direction_t>((uint8_t)(max_value + 16 + round(delta / sources)) % 16);
 }
 
 
@@ -510,14 +534,11 @@ void SensorHub::resetLuminosity(void) {
   _last_luminosity = NAN;
 }
 
-void SensorHub::resetRainLevel(void) {
+void SensorHub::resetRain(void) {
   _last_rainlevel = NAN;
 }
 
-void SensorHub::resetWindSpeed(void) {
+void SensorHub::resetWind(void) {
   _last_windspeed = NAN;
-}
-
-void SensorHub::resetWindDirection(void) {
   _last_winddirection = WD_UNKNOWN;
 }
