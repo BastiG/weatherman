@@ -461,13 +461,12 @@ float SensorHub::readWind(void) {
       (_beacon_timeout && now - _last_wind_time > _beacon_timeout)) {
     String message = "{\"speed\":" + String(windspeed) + ",\"degrees\":" + WindVane::toDegrees(winddirection) + ",\"direction\":\"" + WindVane::toName(winddirection) + "\"}";
     if (_mqtt->sendMessage("wind", 1, false, message)) {
-      Serial.print("Wind speed published: ");
-      Serial.println(windspeed);
+      Serial.print("Wind reading published, speed: "); Serial.print(windspeed); Serial.print(", direction: "); Serial.println(winddirection);
       _last_windspeed = windspeed;
       _last_winddirection = winddirection;
       _last_wind_time = now;
     } else {
-      Serial.println("Couldn't publish wind speed");
+      Serial.println("Couldn't publish wind reading");
     }
   }
 
