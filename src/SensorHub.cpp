@@ -15,12 +15,6 @@ SensorHub::SensorHub(Basecamp *iot, MqttWeatherClient *mqtt) :
     _last_temperature_time(0), _last_pressure_time(0), _last_humidity_time(0),
     _last_luminosity_time(0), _last_rainlevel_time(0), _last_wind_time(0) {
   mqtt->setSensors(this);
-
-  if (_iot->configuration.keyExists(CONFIG_BEACON_TIMEOUT)) {
-    _beacon_timeout = std::strtoul(_iot->configuration.get(CONFIG_BEACON_TIMEOUT).c_str(), nullptr, 10) * 60 * 1000;
-  } else {
-    _beacon_timeout = DEFAULT_BEACON_TIMEOUT;
-  }
 }
 
 void SensorHub::setupBasecamp(void) {
@@ -35,6 +29,12 @@ void SensorHub::setupBasecamp(void) {
 
     _iot->web.addInterfaceElement("beacon_timeout", "input", "Beacon Timeout", "#configform", CONFIG_BEACON_TIMEOUT);
     _iot->web.setInterfaceElementAttribute("beacon_timeout", "type", "number");
+
+    if (_iot->configuration.keyExists(CONFIG_BEACON_TIMEOUT)) {
+      _beacon_timeout = std::strtoul(_iot->configuration.get(CONFIG_BEACON_TIMEOUT).c_str(), nullptr, 10) * 60 * 1000;
+    } else {
+      _beacon_timeout = DEFAULT_BEACON_TIMEOUT;
+    }
   } else {
     _iot_status.fail("Basecamp init failed");
   }

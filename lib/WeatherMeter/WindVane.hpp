@@ -1,5 +1,4 @@
-#ifndef _WINDVANE_HPP_
-#define _WINDVANE_HPP_
+#pragma once
 
 #include <Arduino.h>
 #include <driver/adc.h>
@@ -43,5 +42,3 @@ class WindVane {
         static String toName(wind_direction_t wd);
         static float toDegrees(wind_direction_t wd);
 };
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _ANEMOMENTER_HPP_
-#define _ANEMOMENTER_HPP_
+#pragma once
 
 #include <Arduino.h>
 
@@ -40,5 +39,3 @@ class Anenometer {
 
         void setWindWarning(void (*wind_warning)(float), float warn_threshold);
 };
-
-#endif

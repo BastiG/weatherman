@@ -1,5 +1,4 @@
-#ifndef _RAINGAUGE_HPP_
-#define _RAINGAUGE_HPP_
+#pragma once
 
 #include <Arduino.h>
 
@@ -36,5 +35,3 @@ class RainGauge {
 
         float getRainLevel(rain_timeframe_t timeframe);
 };
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _WEATHERMAN_CONFIG_H_
-#define _WEATHERMAN_CONFIG_H_
+#pragma once
 
 #define PIN_LED         5
 #define PIN_ANEMOMETER  33  // Black wire
@@ -27,5 +26,3 @@
 #define CONFIG_DEVICE_ID        "DeviceId"
 #define CONFIG_WIND_WARNING     "WindWarning"
 #define CONFIG_BEACON_TIMEOUT   "BeaconTimeout"
-
-#endif

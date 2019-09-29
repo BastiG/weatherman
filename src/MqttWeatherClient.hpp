@@ -1,5 +1,4 @@
-#ifndef _WEATHERMAN_MQTTWEATHERCLIENT_HPP_
-#define _WEATHERMAN_MQTTWEATHERCLIENT_HPP_
+#pragma once
 
 #include <Basecamp.hpp>
 #include <Arduino.h>
@@ -47,5 +46,3 @@ class MqttWeatherClient {
     void setSensors(SensorHub *sensorHub);
     String getOnlineTopic(void);
 };
-
-#endif

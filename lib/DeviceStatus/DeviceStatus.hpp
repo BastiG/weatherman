@@ -1,5 +1,4 @@
-#ifndef _DEVICESTATUS_HPP_
-#define _DEVICESTATUS_HPP_
+#pragma once
 
 #include <Arduino.h>
 
@@ -23,5 +22,3 @@ class DeviceStatus {
         void recover();
         String failureMessage();
 };
-
-#endif

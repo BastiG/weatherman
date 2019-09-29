@@ -1,5 +1,4 @@
-#ifndef _WEATHERMAN_SENSORHUB_HPP_
-#define _WEATHERMAN_SENSORHUB_HPP_
+#pragma once
 
 #include "DeviceStatus.hpp"
 #include "Basecamp.hpp"
@@ -100,5 +99,3 @@ class SensorHub{
         void resetRain(void);
         void resetWind(void);
 };
-
-#endif
