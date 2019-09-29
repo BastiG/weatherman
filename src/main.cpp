@@ -30,6 +30,7 @@ void wind_warning_callback(float wind_speed) {
 
 void setup() {
   sensors.setupBasecamp();
+  mqttClient.setLWT();
 
   pinMode(PIN_LED, OUTPUT);
 

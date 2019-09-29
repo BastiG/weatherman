@@ -3,15 +3,17 @@
 
 #include "constants.h"
 
-const String MqttWeatherClient::MAIN_TOPIC = MQTT_MAIN_TOPIC;
+String MqttWeatherClient::getTopicRoot(void) {
+  return MQTT_MAIN_TOPIC;
+}
+
+char* lwt;
 
 MqttWeatherClient::MqttWeatherClient(AsyncMqttClient *mqtt, Configuration *configuration) :
         _mqtt_failed(0), _mqtt(mqtt), _configuration(configuration), _id("0") {
     Serial.println("MqttWeatherClient constructor called");
 
     using namespace std::placeholders;
-
-    // TODO set LWT
 
     _mqtt->onConnect(std::bind(&MqttWeatherClient::mqttConnected, this, _1));
     _mqtt->onDisconnect(std::bind(&MqttWeatherClient::mqttDisconnected, this, _1));
@@ -35,12 +37,12 @@ void MqttWeatherClient::mqttSendStatus(char* payload) {
 
 void MqttWeatherClient::registerCallback(String topic, bool register_wildcard, mqtt_callback_t callback) {
   std::vector<String> topics = {
-    MqttWeatherClient::MAIN_TOPIC + "/send/" + _id + "/" + topic,
-    MqttWeatherClient::MAIN_TOPIC + "/send/*/" + topic
+    MqttWeatherClient::getTopicRoot() + "/send/" + _id + "/" + topic,
+    MqttWeatherClient::getTopicRoot() + "/send/*/" + topic
   };
   if (register_wildcard) {
-    topics.push_back(MqttWeatherClient::MAIN_TOPIC + "/send/" + _id + "/*");
-    topics.push_back(MqttWeatherClient::MAIN_TOPIC + "/send/*/*");
+    topics.push_back(MqttWeatherClient::getTopicRoot() + "/send/" + _id + "/*");
+    topics.push_back(MqttWeatherClient::getTopicRoot() + "/send/*/*");
   }
 
   for (uint8_t i=0; i<topics.size(); i++) {
@@ -65,9 +67,9 @@ void MqttWeatherClient::mqttConnected(bool sessionPresent) {
     _id = _configuration->get(CONFIG_DEVICE_ID);
   }
 
-  _mqtt->subscribe((MAIN_TOPIC + "/send/" + _id + "/#").c_str(),2);
-  _mqtt->subscribe((MAIN_TOPIC + "/send/*/#").c_str(),2);
-  _mqtt->publish((MAIN_TOPIC + "/status/online/" + _id).c_str(), 1, true, String(millis()).c_str());
+  _mqtt->subscribe((getTopicRoot() + "/send/" + _id + "/#").c_str(),2);
+  _mqtt->subscribe((getTopicRoot() + "/send/*/#").c_str(),2);
+  _mqtt->publish((getOnlineTopic()).c_str(), 1, true, String(millis()).c_str());
 
   messageCallbacks.clear();
   registerCallback("status", false, [](MqttWeatherClient *client, char *payload) { client->mqttSendStatus(payload); });
@@ -118,7 +120,7 @@ bool MqttWeatherClient::sendMessage(String type, int qos, bool persistent, Strin
     _mqtt->connect();
   }
   if (_mqtt->connected()) {
-    String topic = MAIN_TOPIC + "/" + type + "/" + _id;
+    String topic = getTopicRoot() + "/" + type + "/" + _id;
     uint16_t rc = _mqtt->publish(topic.c_str(), qos, persistent, payload.c_str());
     if (rc == 0) {
       Serial.print("MQTT publish failed: ");
@@ -139,4 +141,22 @@ bool MqttWeatherClient::sendMessage(String type, int qos, bool persistent, Strin
 
 void MqttWeatherClient::setSensors(SensorHub *sensorHub) {
   _sensorHub = sensorHub;
+}
+
+void MqttWeatherClient::setLWT(void) {
+  String onlineTopic = getOnlineTopic();
+  char *c_onlineTopic = (char *)calloc(1, onlineTopic.length()+1);
+  strncpy(c_onlineTopic, onlineTopic.c_str(), onlineTopic.length());
+  lwt = c_onlineTopic;
+
+  _mqtt->setWill(c_onlineTopic, 0, true, nullptr);
+  _mqtt->disconnect();
+}
+
+String MqttWeatherClient::getOnlineTopic(void) {
+  if (_configuration->keyExists(CONFIG_DEVICE_ID)) {
+    _id = _configuration->get(CONFIG_DEVICE_ID);
+  }
+
+  return MqttWeatherClient::getTopicRoot() + "/status/online/" + _id;
 }

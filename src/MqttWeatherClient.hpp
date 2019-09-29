@@ -14,7 +14,7 @@ typedef void (*mqtt_callback_t)(MqttWeatherClient*, char*);
 
 class MqttWeatherClient {
   private:
-    static const String MAIN_TOPIC;
+    static String getTopicRoot(void);
 
     void mqttConnected(bool sessionPresent);
     void mqttDisconnected(AsyncMqttClientDisconnectReason reason);
@@ -43,7 +43,9 @@ class MqttWeatherClient {
     MqttWeatherClient(AsyncMqttClient *client, Configuration *configuration);
     bool sendMessage(String type, int qos, bool persistent, String payload);
 
+    void setLWT(void);
     void setSensors(SensorHub *sensorHub);
+    String getOnlineTopic(void);
 };
 
 #endif
