@@ -46,13 +46,14 @@ bool SensorHub::isBasecampReady(void) {
 
 
 template <class T>
-bool SensorHub::setupSensor(std::vector<Sensor<T>>& sensor_list, T *device, String deviceName, std::function<bool(void)> beginFunc) {
+bool SensorHub::setupSensor(std::vector<Sensor<T>>& sensor_list, T *device, String deviceName, std::function<bool(void)> beginFunc, void* additional) {
   size_t id = sensor_list.size();
 
   Sensor<T> sensor = {
     .status=new DeviceStatus(deviceName + " " + id + " has failed"),
     .sensor=device,
-    .begin=beginFunc
+    .begin=beginFunc,
+    .additional=additional
   };
   if (sensor.begin()) {
     sensor.status->initDone();
@@ -73,8 +74,9 @@ bool SensorHub::setupBmp280(Adafruit_BMP280 *bmp280) {
 
 bool SensorHub::setupSi7021(Adafruit_Si7021 *si7021) {
   std::function<bool()> beginFunc = std::bind(&Adafruit_Si7021::begin, si7021);
-
-  return setupSensor(_si7021_list, si7021, "Si7021", beginFunc);
+  Si7021_Additional *additional = new Si7021_Additional();
+  additional->heating_since=0;
+  return setupSensor(_si7021_list, si7021, "Si7021", beginFunc, additional);
 }
 
 bool SensorHub::setupTsl2591(Adafruit_TSL2591 *tsl2591) {
@@ -302,6 +304,22 @@ float SensorHub::readHumidity(void) {
       sensor.status->fail();
     } else {
       sensor.status->recover();
+/*
+      if (value > 80) {
+        Si7021_Additional *additional = (Si7021_Additional*)sensor.additional;
+        if (additional->heating_since == 0) {
+          sensor.sensor->setHeater(true);
+          additional->heating_since++;
+        } else if (additional->heating_since < MAX_HEATER_DURATION) {
+          additional->heating_since++;
+          continue;
+        } else {
+          sensor.sensor->setHeader(false);
+          additional->heating_since=0;
+          continue;
+        }
+      }
+*/
       humidity += value;
       sources++;
     }
@@ -348,8 +366,8 @@ float SensorHub::readLuminosity(void) {
 
       sensors_event_t event;
       sensor.sensor->getEvent(&event);
-      if ((event.light == 0) |
-          (event.light > 4294966000.0) | 
+      if ((event.light == 0) ||
+          (event.light > 4294966000.0) || 
           (event.light <-4294966000.0)) {
         sensor.status->fail();
       } else {
@@ -448,14 +466,14 @@ float SensorHub::readWind(void) {
     }
   }
 
-  if (sources == 0) {
+  wind_direction_t winddirection = getWindDirection();
+
+  if (sources == 0 || winddirection == WD_UNKNOWN) {
     resetWind();
     return NAN;
   }
 
   windspeed /= sources;
-
-  wind_direction_t winddirection = getWindDirection();
 
   if (isnan(_last_windspeed) || abs(_last_windspeed - windspeed) > _MIN_DELTA_WIND_SPEED || (windspeed == 0 && _last_windspeed != 0) || winddirection != _last_winddirection ||
       (_beacon_timeout && now - _last_wind_time > _beacon_timeout)) {

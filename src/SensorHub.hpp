@@ -19,6 +19,11 @@ struct Sensor {
     DeviceStatus *status;
     T *sensor;
     std::function<bool(void)> begin;
+    void *additional;
+};
+
+struct Si7021_Additional {
+    uint8_t heating_since;
 };
 
 class SensorHub{
@@ -51,7 +56,7 @@ class SensorHub{
         ulong _beacon_timeout;
 
         template <class T>
-        bool setupSensor(std::vector<Sensor<T>>& sensor_list, T *device, String deviceName, std::function<bool(void)> beginFunc);
+        bool setupSensor(std::vector<Sensor<T>>& sensor_list, T *device, String deviceName, std::function<bool(void)> beginFunc, void *additional=nullptr);
         template <class T>
         void prepareSensors(std::vector<Sensor<T>>& sensor_list);
         template <class T>
