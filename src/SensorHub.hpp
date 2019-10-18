@@ -9,6 +9,7 @@
 #include "RainGauge.hpp"
 #include "Anemometer.hpp"
 #include "WindVane.hpp"
+#include "Logger.hpp"
 
 extern "C" {
   class MqttWeatherClient;
@@ -22,15 +23,13 @@ struct Sensor {
     void *additional;
 };
 
-struct Si7021_Additional {
-    uint8_t heating_since;
-};
-
 class SensorHub{
     private:
         Basecamp *_iot;
         DeviceStatus _iot_status;
         MqttWeatherClient *_mqtt;
+        Logger& _logger;
+
         std::vector<Sensor<Adafruit_BMP280>> _bmp280_list;
         std::vector<Sensor<Adafruit_Si7021>> _si7021_list;
         std::vector<Sensor<Adafruit_TSL2591>> _tsl2591_list;
@@ -64,7 +63,7 @@ class SensorHub{
 
         wind_direction_t getWindDirection(void);
     public:
-        SensorHub(Basecamp *iot, MqttWeatherClient *mqtt);
+        SensorHub(Basecamp *iot, MqttWeatherClient *mqtt, Logger& logger);
 
         void setupBasecamp(void);
         bool isBasecampReady(void);

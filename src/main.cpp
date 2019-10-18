@@ -2,6 +2,7 @@
 
 #include "MqttWeatherClient.hpp"
 #include "SensorHub.hpp"
+#include "Logger.hpp"
 
 #include "constants.h"
 
@@ -18,10 +19,10 @@ Anenometer anenometer(PIN_ANEMOMETER);
 RainGauge rainGauge(PIN_RAINGAUGE);
 WindVane windVane(PIN_WINDVANE);
 
-
 MqttWeatherClient mqttClient(&iot.mqtt, &iot.configuration);
+Logger logger(mqttClient);
 
-SensorHub sensors(&iot, &mqttClient);
+SensorHub sensors(&iot, &mqttClient, logger);
 
 
 void wind_warning_callback(float wind_speed) {

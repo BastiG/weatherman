@@ -5,8 +5,13 @@
 
 #include "constants.h"
 
-SensorHub::SensorHub(Basecamp *iot, MqttWeatherClient *mqtt) :
-    _iot(iot), _iot_status("Basecamp failed"), _mqtt(mqtt),
+struct Si7021_Additional {
+    uint8_t heating;
+    uint8_t cooldown;
+};
+
+SensorHub::SensorHub(Basecamp *iot, MqttWeatherClient *mqtt, Logger& logger) :
+    _iot(iot), _iot_status("Basecamp failed"), _mqtt(mqtt), _logger(logger),
     _bmp280_list(), _si7021_list(), _tsl2591_list(),
     _raingauge_list(), _anenometer_list(), _windvane_list(),
     _last_temperature(NAN), _last_pressure(NAN), _last_humidity(NAN),
@@ -75,12 +80,17 @@ bool SensorHub::setupBmp280(Adafruit_BMP280 *bmp280) {
 bool SensorHub::setupSi7021(Adafruit_Si7021 *si7021) {
   std::function<bool()> beginFunc = std::bind(&Adafruit_Si7021::begin, si7021);
   Si7021_Additional *additional = new Si7021_Additional();
-  additional->heating_since=0;
+  additional->heating = 0;
+  additional->cooldown = 0;
+  si7021->setHeater(false);
+
   return setupSensor(_si7021_list, si7021, "Si7021", beginFunc, additional);
 }
 
 bool SensorHub::setupTsl2591(Adafruit_TSL2591 *tsl2591) {
   std::function<bool()> beginFunc = std::bind(&Adafruit_TSL2591::begin, tsl2591);
+  tsl2591->setGain(TSL2591_GAIN_LOW);
+  tsl2591->setTiming(TSL2591_INTEGRATIONTIME_100MS);
 
   return setupSensor(_tsl2591_list, tsl2591, "TSL2591", beginFunc);
 }
@@ -210,6 +220,11 @@ float SensorHub::readTemperature(void) {
     Sensor<Adafruit_Si7021> sensor = _si7021_list[i];
     if (!sensor.status->isInitDone()) continue;
 
+    Si7021_Additional *additional = (Si7021_Additional*)sensor.additional;
+    if (additional->cooldown > 0) {
+      continue;
+    }
+
     float value = sensor.sensor->readTemperature();
     if (isnan(value)) {
       sensor.status->fail();
@@ -229,7 +244,10 @@ float SensorHub::readTemperature(void) {
 
   if (isnan(_last_temperature) || abs(_last_temperature - temperature) > _MIN_DELTA_TEMPERATURE ||
       (_beacon_timeout && now - _last_temperature_time > _beacon_timeout)) {
-    if (_mqtt->sendMessage("temperature", 1, false, (String)temperature)) {
+    StaticJsonBuffer<200> jsonBuffer;
+    JsonObject& message = jsonBuffer.createObject();
+    message["value"] = temperature;
+    if (_mqtt->sendMessage("temperature", 1, false, message)) {
       Serial.print("Temperature published: "); Serial.println(temperature);
       _last_temperature = temperature;
       _last_temperature_time = now;
@@ -277,7 +295,10 @@ float SensorHub::readPressure(void) {
 
   if (isnan(_last_pressure) || abs(_last_pressure - pressure) > _MIN_DELTA_PRESSURE ||
       (_beacon_timeout && now - _last_pressure_time > _beacon_timeout)) {
-    if (_mqtt->sendMessage("pressure", 1, false, (String)pressure)) {
+    StaticJsonBuffer<200> jsonBuffer;
+    JsonObject& message = jsonBuffer.createObject();
+    message["value"] = pressure;
+    if (_mqtt->sendMessage("pressure", 1, false, message)) {
       Serial.print("Pressure published: "); Serial.println(pressure);
       _last_pressure = pressure;
       _last_pressure_time = now;
@@ -294,38 +315,48 @@ float SensorHub::readHumidity(void) {
   float humidity = 0;
   uint8_t sources = 0;
   ulong now = millis();
+  bool heating = false;
 
   for (uint8_t i = 0; i<_si7021_list.size(); i++) {
     Sensor<Adafruit_Si7021> sensor = _si7021_list[i];
     if (!sensor.status->isInitDone()) continue;
+
+    sensor.sensor->setHeater(false);
+    //_logger.log("SI7021 Heater OFF");
+
+    Si7021_Additional *additional = (Si7021_Additional*)sensor.additional;
+    if (additional->heating > 0 && additional->heating < _MAX_HEATER_DURATION) {
+      additional->heating++;
+      heating = true;
+      continue;
+    }
+    additional->heating = 0;
+
+    if (additional->cooldown > 0) {
+      additional->cooldown--;
+      heating = true;
+      continue;
+    }
 
     float value = sensor.sensor->readHumidity();
     if (isnan(value)) {
       sensor.status->fail();
     } else {
       sensor.status->recover();
-/*
+
       if (value > 80) {
-        Si7021_Additional *additional = (Si7021_Additional*)sensor.additional;
-        if (additional->heating_since == 0) {
-          sensor.sensor->setHeater(true);
-          additional->heating_since++;
-        } else if (additional->heating_since < MAX_HEATER_DURATION) {
-          additional->heating_since++;
-          continue;
-        } else {
-          sensor.sensor->setHeader(false);
-          additional->heating_since=0;
-          continue;
-        }
+        sensor.sensor->setHeater(true, 0x2);
+        //_logger.log("SI7021 Heater ON");
+        additional->heating = 1;
+        additional->cooldown = 5 * _MAX_HEATER_DURATION;
       }
-*/
+
       humidity += value;
       sources++;
     }
   }
 
-  if (sources == 0) {
+  if (sources == 0 && !heating) {
     resetHumidity();
     return NAN;
   }
@@ -334,7 +365,10 @@ float SensorHub::readHumidity(void) {
 
   if (isnan(_last_humidity) || abs(_last_humidity - humidity) > _MIN_DELTA_HUMIDITY ||
       (_beacon_timeout && now - _last_humidity_time > _beacon_timeout)) {
-    if (_mqtt->sendMessage("humidity", 1, false, (String)humidity)) {
+    StaticJsonBuffer<200> jsonBuffer;
+    JsonObject& message = jsonBuffer.createObject();
+    message["value"] = humidity;
+    if (_mqtt->sendMessage("humidity", 1, false, message)) {
       Serial.print("Humidity published: "); Serial.println(humidity);
       _last_humidity = humidity;
       _last_humidity_time = now;
@@ -364,7 +398,7 @@ float SensorHub::readLuminosity(void) {
         sensor.sensor->reset();
       }
 
-      sensors_event_t event;
+      /*sensors_event_t event;
       sensor.sensor->getEvent(&event);
       if ((event.light == 0) ||
           (event.light > 4294966000.0) || 
@@ -378,6 +412,14 @@ float SensorHub::readLuminosity(void) {
         luminosity += isnan(event.light) ? 0 : event.light;
         sources++;
       }
+      */
+      uint32_t lum = sensor.sensor->getFullLuminosity();
+      uint16_t ir, full;
+      ir = lum >> 16;
+      full = lum & 0xFFFF;
+      float value = sensor.sensor->calculateLux(full, ir);
+      luminosity += (isnan(value) ? 0 : value);
+      sources++;
     }
   }
 
@@ -389,7 +431,10 @@ float SensorHub::readLuminosity(void) {
 
   if (isnan(_last_luminosity) || abs(_last_luminosity - luminosity) > _MIN_DELTA_LUMINOSITY || (luminosity == 0 && _last_luminosity != 0) ||
       (_beacon_timeout && now - _last_luminosity_time > _beacon_timeout)) {
-    if (_mqtt->sendMessage("luminosity", 1, false, (String)luminosity)) {
+    StaticJsonBuffer<500> jsonBuffer;
+    JsonObject& message = jsonBuffer.createObject();
+    message["value"] = luminosity;
+    if (_mqtt->sendMessage("luminosity", 1, false, message)) {
       Serial.print("Luminosity published: "); Serial.println(luminosity);
       _last_luminosity = luminosity;
       _last_luminosity_time = now;
@@ -433,7 +478,10 @@ float SensorHub::readRain(void) {
 
   if (isnan(_last_rainlevel) || abs(_last_rainlevel - rainlevel) > _MIN_DELTA_RAIN_LEVEL || (rainlevel == 0 && _last_rainlevel != 0) ||
       (_beacon_timeout && now - _last_rainlevel_time > _beacon_timeout)) {
-    if (_mqtt->sendMessage("rain", 1, false, (String)rainlevel)) {
+    StaticJsonBuffer<200> jsonBuffer;
+    JsonObject& message = jsonBuffer.createObject();
+    message["value"] = rainlevel;
+    if (_mqtt->sendMessage("rain", 1, false, message)) {
       Serial.print("Rain level published: "); Serial.println(rainlevel);
       _last_rainlevel = rainlevel;
       _last_rainlevel_time = now;
@@ -477,7 +525,11 @@ float SensorHub::readWind(void) {
 
   if (isnan(_last_windspeed) || abs(_last_windspeed - windspeed) > _MIN_DELTA_WIND_SPEED || (windspeed == 0 && _last_windspeed != 0) || winddirection != _last_winddirection ||
       (_beacon_timeout && now - _last_wind_time > _beacon_timeout)) {
-    String message = "{\"speed\":" + String(windspeed) + ",\"degrees\":" + WindVane::toDegrees(winddirection) + ",\"direction\":\"" + WindVane::toName(winddirection) + "\"}";
+    StaticJsonBuffer<500> jsonBuffer;
+    JsonObject& message = jsonBuffer.createObject();
+    message["speed"]      = windspeed;
+    message["degrees"]    = WindVane::toDegrees(winddirection);
+    message["direction"]  = WindVane::toName(winddirection);
     if (_mqtt->sendMessage("wind", 1, false, message)) {
       Serial.print("Wind reading published, speed: "); Serial.print(windspeed); Serial.print(", direction: "); Serial.println(winddirection);
       _last_windspeed = windspeed;
