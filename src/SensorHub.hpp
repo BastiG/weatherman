@@ -52,6 +52,7 @@ class SensorHub{
         ulong _last_rainlevel_time;
         ulong _last_wind_time;
 
+        float _heater_threshold;
         ulong _beacon_timeout;
 
         template <class T>

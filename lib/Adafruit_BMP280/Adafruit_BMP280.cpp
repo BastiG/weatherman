@@ -73,7 +73,7 @@ bool Adafruit_BMP280::begin(uint8_t addr, uint8_t chipid) {
 
   if (_cs == -1) {
     // i2c
-    _wire->begin();
+    _wire->begin(-1, -1, 100000);
   } else {
     digitalWrite(_cs, HIGH);
     pinMode(_cs, OUTPUT);

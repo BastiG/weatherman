@@ -80,7 +80,7 @@ Adafruit_TSL2591::Adafruit_TSL2591(int32_t sensorID)
 /**************************************************************************/
 boolean Adafruit_TSL2591::begin(void)
 {
-  Wire.begin();
+  Wire.begin(-1, -1, 100000);
 
   /*
   for (uint8_t i=0; i<0x20; i++)

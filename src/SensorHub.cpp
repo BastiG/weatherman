@@ -18,7 +18,8 @@ SensorHub::SensorHub(Basecamp *iot, MqttWeatherClient *mqtt, Logger& logger) :
     _last_luminosity(NAN), _last_rainlevel(NAN), _last_windspeed(NAN),
     _last_winddirection(WD_UNKNOWN),
     _last_temperature_time(0), _last_pressure_time(0), _last_humidity_time(0),
-    _last_luminosity_time(0), _last_rainlevel_time(0), _last_wind_time(0) {
+    _last_luminosity_time(0), _last_rainlevel_time(0), _last_wind_time(0),
+    _heater_threshold(DEFAULT_HEATER_THRESHOLD), _beacon_timeout(DEFAULT_BEACON_TIMEOUT) {
   mqtt->setSensors(this);
 }
 
@@ -32,14 +33,19 @@ void SensorHub::setupBasecamp(void) {
     _iot->web.addInterfaceElement("wind_warning", "input", "Wind Warning", "#configform", CONFIG_WIND_WARNING);
     _iot->web.setInterfaceElementAttribute("wind_warning", "type", "number");
 
+    _iot->web.addInterfaceElement("heater_threshold", "input", "Heater Threshold", "#configform", CONFIG_HEATER_THRESHOLD);
+    _iot->web.setInterfaceElementAttribute("heater_threshold", "type", "number");
+
     _iot->web.addInterfaceElement("beacon_timeout", "input", "Beacon Timeout", "#configform", CONFIG_BEACON_TIMEOUT);
     _iot->web.setInterfaceElementAttribute("beacon_timeout", "type", "number");
 
+    if (_iot->configuration.keyExists(CONFIG_HEATER_THRESHOLD)) {
+      _heater_threshold = (float)std::atoi(_iot->configuration.get(CONFIG_HEATER_THRESHOLD).c_str());
+    }
     if (_iot->configuration.keyExists(CONFIG_BEACON_TIMEOUT)) {
       _beacon_timeout = std::strtoul(_iot->configuration.get(CONFIG_BEACON_TIMEOUT).c_str(), nullptr, 10) * 60 * 1000;
-    } else {
-      _beacon_timeout = DEFAULT_BEACON_TIMEOUT;
     }
+
   } else {
     _iot_status.fail("Basecamp init failed");
   }
@@ -90,7 +96,7 @@ bool SensorHub::setupSi7021(Adafruit_Si7021 *si7021) {
 bool SensorHub::setupTsl2591(Adafruit_TSL2591 *tsl2591) {
   std::function<bool()> beginFunc = std::bind(&Adafruit_TSL2591::begin, tsl2591);
   tsl2591->setGain(TSL2591_GAIN_LOW);
-  tsl2591->setTiming(TSL2591_INTEGRATIONTIME_100MS);
+  tsl2591->setTiming(TSL2591_INTEGRATIONTIME_300MS);
 
   return setupSensor(_tsl2591_list, tsl2591, "TSL2591", beginFunc);
 }
@@ -321,9 +327,6 @@ float SensorHub::readHumidity(void) {
     Sensor<Adafruit_Si7021> sensor = _si7021_list[i];
     if (!sensor.status->isInitDone()) continue;
 
-    sensor.sensor->setHeater(false);
-    //_logger.log("SI7021 Heater OFF");
-
     Si7021_Additional *additional = (Si7021_Additional*)sensor.additional;
     if (additional->heating > 0 && additional->heating < _MAX_HEATER_DURATION) {
       additional->heating++;
@@ -331,6 +334,9 @@ float SensorHub::readHumidity(void) {
       continue;
     }
     additional->heating = 0;
+
+    sensor.sensor->setHeater(false);
+    //_logger.log("SI7021 Heater OFF");
 
     if (additional->cooldown > 0) {
       additional->cooldown--;
@@ -344,7 +350,7 @@ float SensorHub::readHumidity(void) {
     } else {
       sensor.status->recover();
 
-      if (value > 80) {
+      if (value > _heater_threshold) {
         sensor.sensor->setHeater(true, 0x2);
         //_logger.log("SI7021 Heater ON");
         additional->heating = 1;
@@ -356,7 +362,9 @@ float SensorHub::readHumidity(void) {
     }
   }
 
-  if (sources == 0 && !heating) {
+  if (sources == 0) {
+    if (heating)
+      return _last_humidity;
     resetHumidity();
     return NAN;
   }
@@ -418,8 +426,10 @@ float SensorHub::readLuminosity(void) {
       ir = lum >> 16;
       full = lum & 0xFFFF;
       float value = sensor.sensor->calculateLux(full, ir);
-      luminosity += (isnan(value) ? 0 : value);
-      sources++;
+      if (value != -1) {
+        luminosity += (isnan(value) ? 0 : value);
+        sources++;
+      }
     }
   }
 

@@ -21,9 +21,11 @@
 #define _MAX_HEATER_DURATION    1       // maximum number of cycles that the heater may be enabled
 
 #define DEFAULT_WIND_WARNING    30      // warn for wind speeds > 30 km/h
+#define DEFAULT_HEATER_THRESHOLD 80     // turn on heater if humidity goes beyond 80 %
 #define DEFAULT_BEACON_TIMEOUT  5*60*1000  // publish every 5 minutes
 
 #define MQTT_MAIN_TOPIC         "weatherman"
 #define CONFIG_DEVICE_ID        "DeviceId"
 #define CONFIG_WIND_WARNING     "WindWarning"
+#define CONFIG_HEATER_THRESHOLD "HeatingThreshold"
 #define CONFIG_BEACON_TIMEOUT   "BeaconTimeout"
